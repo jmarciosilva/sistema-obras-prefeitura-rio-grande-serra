@@ -34,17 +34,44 @@ class ObraController extends Controller
     {
         $obra->load([
             'status',
-            // Convênios com órgão e categoria para a aba Convênios
             'convenios.orgaoFinanciador',
             'convenios.categoria',
-            // Contratos com empresa e execuções para as abas Contratos e Execuções
             'contratos.empresa',
             'contratos.execucoes.documentos.usuario',
-            // Documentos diretos da obra (com usuário para exibir quem enviou)
             'documentos.usuario',
         ]);
 
-        return view('obras.show', compact('obra'));
+        // Todos os convênios disponíveis para o modal de vínculos
+        $todosConvenios = Convenio::with(['categoria', 'orgaoFinanciador'])
+            ->orderBy('numero_convenio_ano')
+            ->get();
+
+        return view('obras.show', compact('obra', 'todosConvenios'));
+    }
+
+    // ── Sync Convênios (modal da aba Convênios) ────────────────────
+    public function syncConvenios(Request $request, Obra $obra): RedirectResponse
+    {
+        $request->validate([
+            'convenios'   => 'nullable|array',
+            'convenios.*' => 'exists:convenios,id',
+        ]);
+
+        try {
+            DB::beginTransaction();
+            $obra->convenios()->sync($request->input('convenios', []));
+            DB::commit();
+
+            return redirect()
+                ->route('obras.show', $obra)
+                ->with('sucesso', 'Convênios atualizados com sucesso!')
+                ->with('aba', 'convenios');
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Erro ao sincronizar convênios da obra', ['obra_id' => $obra->id, 'erro' => $e->getMessage()]);
+
+            return back()->withErrors(['geral' => 'Ocorreu um erro ao salvar os vínculos.']);
+        }
     }
 
     // ── Create ─────────────────────────────────────────────────────

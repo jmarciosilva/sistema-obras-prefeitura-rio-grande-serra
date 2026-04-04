@@ -8,31 +8,23 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Model: Documento anexado a Obras, Convênios ou Contratos.
+ * Model: Documento anexado a Obras, Convênios, Contratos ou Medições.
  *
- * Utiliza polimorfismo (documentável) para que o mesmo model
+ * Utiliza polimorfismo (documentable) para que o mesmo model
  * sirva a múltiplas entidades sem duplicar tabelas.
  *
- * @property int    $id
- * @property string $documentavel_type   Classe do modelo pai
- * @property int    $documentavel_id     ID do modelo pai
- * @property int    $user_id             Quem fez o upload
- * @property string $tipo                (contrato|medicao|foto|ata|outros)
- * @property string $nome_original       Nome original do arquivo
- * @property string $caminho             Caminho no storage
- * @property string $mime_type
- * @property int    $tamanho_bytes
- * @property string|null $descricao
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * ⚠️  ATENÇÃO — grafia dos campos:
+ * A tabela usa morphs('documentable') → colunas documentable_type / documentable_id
+ * O $fillable DEVE usar a mesma grafia com B (não V).
+ * Grafia errada bloqueia o mass-assignment e salva NULL nas colunas polimórficas.
  */
 class Documento extends Model
 {
     protected $table = 'documentos';
 
     protected $fillable = [
-        'documentavel_type',
-        'documentavel_id',
+        'documentable_type',   // ← com B (correto — igual à coluna da tabela)
+        'documentable_id',     // ← com B (correto — igual à coluna da tabela)
         'user_id',
         'tipo',
         'nome_original',
@@ -48,11 +40,11 @@ class Documento extends Model
 
     // ── Constantes ───────────────────────────────────────────────
 
-    const TIPO_CONTRATO  = 'contrato';
-    const TIPO_MEDICAO   = 'medicao';
-    const TIPO_FOTO      = 'foto';
-    const TIPO_ATA       = 'ata';
-    const TIPO_OUTROS    = 'outros';
+    const TIPO_CONTRATO = 'contrato';
+    const TIPO_MEDICAO  = 'medicao';
+    const TIPO_FOTO     = 'foto';
+    const TIPO_ATA      = 'ata';
+    const TIPO_OUTROS   = 'outros';
 
     public static array $tipos = [
         self::TIPO_CONTRATO => 'Contrato',
@@ -64,8 +56,11 @@ class Documento extends Model
 
     // ── Relacionamentos ───────────────────────────────────────────
 
-    /** Relação polimórfica — retorna a entidade pai (Obra, Convenio, Contrato...). */
-    public function documentavel(): MorphTo
+    /**
+     * Relação polimórfica — retorna a entidade pai (Obra, Convenio, Contrato, ExecucaoObra...).
+     * Usa 'documentable' com B, alinhado com morphs('documentable') na migration.
+     */
+    public function documentable(): MorphTo
     {
         return $this->morphTo();
     }
@@ -77,13 +72,11 @@ class Documento extends Model
 
     // ── Accessors ────────────────────────────────────────────────
 
-    /** URL pública para download. */
     public function getUrlAttribute(): string
     {
         return Storage::url($this->caminho);
     }
 
-    /** Tamanho legível: "2,5 MB". */
     public function getTamanhoLegívelAttribute(): string
     {
         $bytes = $this->tamanho_bytes;
@@ -104,16 +97,15 @@ class Documento extends Model
         return self::$tipos[$this->tipo] ?? ucfirst($this->tipo);
     }
 
-    /** Ícone FontAwesome de acordo com MIME ou tipo. */
     public function getIconeAttribute(): string
     {
         return match (true) {
-            str_contains($this->mime_type, 'pdf')   => 'fa-file-pdf text-danger',
-            str_contains($this->mime_type, 'image') => 'fa-file-image text-info',
-            str_contains($this->mime_type, 'word')  => 'fa-file-word text-primary',
-            str_contains($this->mime_type, 'sheet'),
-            str_contains($this->mime_type, 'excel') => 'fa-file-excel text-success',
-            default                                  => 'fa-file text-secondary',
+            str_contains($this->mime_type ?? '', 'pdf')   => 'fa-file-pdf text-danger',
+            str_contains($this->mime_type ?? '', 'image') => 'fa-file-image text-info',
+            str_contains($this->mime_type ?? '', 'word')  => 'fa-file-word text-primary',
+            str_contains($this->mime_type ?? '', 'sheet'),
+            str_contains($this->mime_type ?? '', 'excel') => 'fa-file-excel text-success',
+            default                                        => 'fa-file text-secondary',
         };
     }
 
@@ -124,13 +116,15 @@ class Documento extends Model
         return $query->where('tipo', $tipo);
     }
 
-    // ── Métodos de negócio ────────────────────────────────────────
+    // ── Eventos ──────────────────────────────────────────────────
 
     /** Remove o arquivo físico do storage ao deletar o registro. */
     protected static function booted(): void
     {
         static::deleting(function (Documento $doc) {
-            Storage::delete($doc->caminho);
+            if ($doc->caminho) {
+                Storage::disk('public')->delete($doc->caminho);
+            }
         });
     }
 }

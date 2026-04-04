@@ -5,7 +5,7 @@
 
 @section('content')
 
-    <div x-data="{ aba: 'geral', ajuda: false, modalDelete: false, urlDelete: '' }">
+    <div x-data="{ aba: '{{ session('aba', 'geral') }}', ajuda: false, modalDelete: false, urlDelete: '', modalConvenios: false }">
 
         {{-- =========================================================
         | HEADER
@@ -59,6 +59,18 @@
 
             </div>
         </div>
+
+        {{-- FLASH --}}
+        @if (session('sucesso'))
+            <div class="mb-4 bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded-lg text-sm">
+                ✅ {{ session('sucesso') }}
+            </div>
+        @endif
+        @if ($errors->has('geral'))
+            <div class="mb-4 bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm">
+                ⚠️ {{ $errors->first('geral') }}
+            </div>
+        @endif
 
         {{-- =========================================================
         | BLOCO DE AJUDA
@@ -280,10 +292,10 @@
                             Convênios vinculados ({{ $obra->convenios->count() }})
                         </h3>
                         @if (auth()->user()->perfil !== 'operador')
-                            <a href="{{ route('obras.edit', $obra) }}"
+                            <button type="button" @click="modalConvenios = true"
                                 class="px-3 py-1.5 text-xs rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100">
-                                ✏️ Gerenciar vínculos
-                            </a>
+                                🔗 Gerenciar vínculos
+                            </button>
                         @endif
                     </div>
 
@@ -339,10 +351,10 @@
                             <p class="text-2xl mb-2">🤝</p>
                             <p class="text-sm">Nenhum convênio vinculado a esta obra.</p>
                             @if (auth()->user()->perfil !== 'operador')
-                                <a href="{{ route('obras.edit', $obra) }}"
+                                <button type="button" @click="modalConvenios = true"
                                     class="inline-block mt-3 text-xs text-indigo-600 hover:underline">
-                                    Clique em "Gerenciar vínculos" para associar convênios
-                                </a>
+                                    🔗 Clique aqui para associar convênios
+                                </button>
                             @endif
                         </div>
                     @endforelse
@@ -874,6 +886,114 @@
 
                 </div>
 
+            </div>
+        </div>
+
+        {{-- =========================================================
+        | MODAL: GERENCIAR CONVÊNIOS
+        ========================================================== --}}
+        <div x-show="modalConvenios" x-cloak
+            class="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto py-8 px-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl" @click.outside="modalConvenios = false">
+
+                {{-- HEADER --}}
+                <div
+                    class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold">🤝 Gerenciar Convênios</h3>
+                        <p class="text-sm opacity-80 mt-0.5">Selecione os convênios vinculados a esta obra</p>
+                    </div>
+                    <button @click="modalConvenios = false"
+                        class="text-white/70 hover:text-white text-2xl leading-none">×</button>
+                </div>
+
+                <form method="POST" action="{{ route('obras.convenios.sync', $obra) }}">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="px-6 py-4 max-h-[60vh] overflow-y-auto">
+
+                        @if ($todosConvenios->isEmpty())
+                            <div class="text-center py-8 text-slate-400">
+                                <p class="text-2xl mb-2">🤝</p>
+                                <p class="text-sm">Nenhum convênio cadastrado no sistema.</p>
+                                <a href="{{ route('convenios.create') }}"
+                                    class="inline-block mt-3 text-xs text-indigo-600 hover:underline">
+                                    ➕ Cadastrar primeiro convênio
+                                </a>
+                            </div>
+                        @else
+                            @php
+                                $conveniosSelecionados = $obra->convenios->pluck('id')->toArray();
+                            @endphp
+
+                            <div class="space-y-2">
+                                @foreach ($todosConvenios as $conv)
+                                    @php $selecionado = in_array($conv->id, $conveniosSelecionados); @endphp
+                                    <label
+                                        class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition
+                                        {{ $selecionado ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-slate-200 hover:bg-slate-50' }}">
+
+                                        <input type="checkbox" name="convenios[]" value="{{ $conv->id }}"
+                                            {{ $selecionado ? 'checked' : '' }}
+                                            class="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500">
+
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="font-medium text-slate-800 text-sm">
+                                                    {{ $conv->numero_convenio_ano ?? 'Convênio #' . $conv->id }}
+                                                </span>
+                                                @if ($conv->categoria)
+                                                    <span
+                                                        class="px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">
+                                                        {{ $conv->categoria->nome }}
+                                                    </span>
+                                                @endif
+                                                @if ($conv->vigencia)
+                                                    @php $venc = $conv->vigencia->isPast(); @endphp
+                                                    <span
+                                                        class="text-xs {{ $venc ? 'text-red-500' : 'text-green-600' }}">
+                                                        {{ $venc ? '⚠️ Vencido' : '✔ Vigente' }}
+                                                        · {{ $conv->vigencia->format('d/m/Y') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            @if ($conv->descricao)
+                                                <p class="text-xs text-slate-500 mt-0.5 truncate">
+                                                    {{ Str::limit($conv->descricao, 80) }}
+                                                </p>
+                                            @endif
+                                            @if ($conv->orgaoFinanciador)
+                                                <p class="text-xs text-slate-400 mt-0.5">
+                                                    🏛️ {{ $conv->orgaoFinanciador->nome }}
+                                                </p>
+                                            @endif
+                                        </div>
+
+                                    </label>
+                                @endforeach
+                            </div>
+                        @endif
+
+                    </div>
+
+                    <div class="px-6 py-4 border-t bg-slate-50 rounded-b-2xl flex justify-between items-center">
+                        <span class="text-xs text-slate-500">
+                            {{ $obra->convenios->count() }} convênio(s) atualmente vinculado(s)
+                        </span>
+                        <div class="flex gap-3">
+                            <button type="button" @click="modalConvenios = false"
+                                class="px-4 py-2 text-sm border rounded-lg text-slate-600 hover:bg-slate-100">
+                                Cancelar
+                            </button>
+                            <button type="submit"
+                                class="px-5 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                                ✔ Salvar vínculos
+                            </button>
+                        </div>
+                    </div>
+
+                </form>
             </div>
         </div>
 

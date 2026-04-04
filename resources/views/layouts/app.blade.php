@@ -111,7 +111,7 @@
                     <a href="{{ route('admin.categorias-convenio.index') }}"
                        class="flex items-center gap-2 px-3 py-2 rounded-md text-sm
                               {{ request()->routeIs('admin.categorias-convenio.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white' }}">
-                        📁 Categorias
+                        📁 Categorias Convênios
                     </a>
 
                     <a href="{{ route('admin.orgaos-financiadores.index') }}"

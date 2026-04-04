@@ -45,6 +45,9 @@ Route::middleware(['auth'])->group(function () {
     // 🏗️ OBRAS (ROTAS EXPLÍCITAS)
     // ───────────────────────────────────────────────────────────
     Route::prefix('obras')->name('obras.')->group(function () {
+        Route::put('/obras/{obra}/convenios/sync', [ObraController::class, 'syncConvenios'])
+            ->name('obras.convenios.sync')
+            ->middleware('perfil:admin,tecnico');
 
         // 📄 LISTAGEM
         Route::get('/', [ObraController::class, 'index'])->name('index');
@@ -59,6 +62,7 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('perfil:admin,tecnico')->group(function () {
             Route::get('/{obra}/editar', [ObraController::class, 'edit'])->name('edit');
             Route::put('/{obra}/atualizar', [ObraController::class, 'update'])->name('update');
+             Route::put('/{obra}/convenios/sync', [ObraController::class, 'syncConvenios'])->name('convenios.sync');
         });
 
         // 👁️ VISUALIZAÇÃO (SEMPRE POR ÚLTIMO)
@@ -68,6 +72,8 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('perfil:admin')->group(function () {
             Route::delete('/{obra}/excluir', [ObraController::class, 'destroy'])->name('destroy');
         });
+
+
 
         // ───────────────
         // 📊 EXECUÇÕES (MEDIÇÕES)
