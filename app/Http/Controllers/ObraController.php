@@ -180,6 +180,103 @@ class ObraController extends Controller
         }
     }
 
+    // ── Gráfico de evolução (Fase 4) ───────────────────────────
+    public function grafico(Obra $obra): \Illuminate\Http\JsonResponse
+    {
+        $obra->load([
+            'contratos.execucoes',
+            'contratos',
+        ]);
+
+        $valorContratado = (float) $obra->valor_contratado;
+
+        // ── 1. Série temporal: todas as medições ordenadas por data ──
+        $medicoes = $obra->contratos
+            ->flatMap(fn($c) => $c->execucoes->map(fn($e) => [
+                'data'                => $e->data_medicao->format('d/m/Y'),
+                'data_iso'            => $e->data_medicao->format('Y-m-d'),
+                'valor_medido'        => (float) $e->valor_medido,
+                'percentual'          => (float) $e->percentual_executado,
+                'saldo'               => (float) ($e->saldo_contratual ?? 0),
+                'contrato_label'      => $c->numero_contrato_ano ?? 'Contrato #'.$c->id,
+            ]))
+            ->sortBy('data_iso')
+            ->values();
+
+        // ── 2. Acumulado por data ─────────────────────────────────
+        $acumulado        = 0;
+        $serieAcumulada   = [];
+
+        foreach ($medicoes as $m) {
+            $acumulado += $m['valor_medido'];
+            $serieAcumulada[] = [
+                'data'       => $m['data'],
+                'acumulado'  => round($acumulado, 2),
+                'percentual' => $valorContratado > 0
+                    ? round(min(($acumulado / $valorContratado) * 100, 100), 2)
+                    : 0,
+            ];
+        }
+
+        // ── 3. Projeção de conclusão ──────────────────────────────
+        // Usa as últimas 3 medições para calcular o ritmo médio (R$/dia)
+        $projecao = null;
+
+        if ($medicoes->count() >= 2) {
+           $ultimas = $medicoes->slice(-3)->values();
+
+            // Diferença de datas entre primeira e última das "últimas"
+            $dataInicio  = \Carbon\Carbon::parse($ultimas->first()['data_iso']);
+            $dataFim     = \Carbon\Carbon::parse($ultimas->last()['data_iso']);
+            $diasPeriodo = max($dataInicio->diffInDays($dataFim), 1);
+
+            $valorPeriodo = $ultimas->sum('valor_medido');
+            $ritmoDiario  = $valorPeriodo / $diasPeriodo; // R$/dia
+
+            $saldoAtual = (float) $obra->saldo_contratual;
+
+            if ($ritmoDiario > 0 && $saldoAtual > 0) {
+                $diasRestantes     = (int) ceil($saldoAtual / $ritmoDiario);
+                $dataConclusao     = now()->addDays($diasRestantes);
+                $projecao = [
+                    'ritmo_diario'      => round($ritmoDiario, 2),
+                    'ritmo_mensal'      => round($ritmoDiario * 30, 2),
+                    'dias_restantes'    => $diasRestantes,
+                    'data_conclusao'    => $dataConclusao->format('d/m/Y'),
+                    'data_conclusao_iso'=> $dataConclusao->format('Y-m-d'),
+                    'confianca'         => $ultimas->count() >= 3 ? 'alta' : 'media',
+                    'base_medicoes'     => $ultimas->count(),
+                ];
+            } elseif ($saldoAtual <= 0) {
+                $projecao = ['concluida' => true];
+            }
+        }
+
+        // ── 4. Dados para o gráfico de barras (contratado × acumulado × saldo) ──
+        $barras = $obra->contratos->map(fn($c) => [
+            'label'      => $c->numero_contrato_ano ?? 'Contrato #'.$c->id,
+            'empresa'    => $c->empresa->nome_fantasia ?? $c->empresa->razao_social ?? '—',
+            'contratado' => (float) $c->valor_contrato,
+            'medido'     => (float) $c->execucoes->sum('valor_medido'),
+            'saldo'      => max((float)$c->valor_contrato - (float)$c->execucoes->sum('valor_medido'), 0),
+        ])->values();
+
+        return response()->json([
+            'obra'             => [
+                'id'              => $obra->id,
+                'descricao'       => $obra->descricao,
+                'valor_contratado'=> $valorContratado,
+                'valor_medido'    => (float) $obra->valor_medido,
+                'saldo'           => (float) $obra->saldo_contratual,
+                'percentual'      => (float) $obra->percentual_executado,
+            ],
+            'medicoes'         => $medicoes,
+            'serie_acumulada'  => $serieAcumulada,
+            'barras'           => $barras,
+            'projecao'         => $projecao,
+        ]);
+    }
+
     // ── Destroy ────────────────────────────────────────────────────
     public function destroy(Obra $obra): RedirectResponse
     {

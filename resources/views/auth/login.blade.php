@@ -95,11 +95,11 @@
                         </label>
 
                         <!-- Link recuperar senha -->
-                        @if (Route::has('password.request'))
+                        {{-- @if (Route::has('password.request'))
                             <a href="{{ route('password.request') }}" class="text-blue-600 hover:underline">
                                 Esqueceu a senha?
                             </a>
-                        @endif
+                        @endif --}}
                     </div>
 
                     <!-- ============================= -->

@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\StatusObraController;
 use App\Http\Controllers\Admin\CategoriaConvenioController;
 use App\Http\Controllers\Admin\OrgaoFinanciadorController;
 use App\Http\Controllers\Admin\DemandaPropostaController;
+use App\Http\Controllers\RelatorioController;
 
 // ───────────────────────────────────────────────────────────────
 // 🔐 ROTAS DE AUTENTICAÇÃO (Laravel Breeze)
@@ -26,6 +27,16 @@ require __DIR__ . '/auth.php';
 // 🔒 ROTAS PROTEGIDAS (USUÁRIO LOGADO)
 // ───────────────────────────────────────────────────────────────
 Route::middleware(['auth'])->group(function () {
+    // ───────────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────────────────────
+    // 📊 RELATÓRIOS
+    // ───────────────────────────────────────────────────────────────
+    Route::prefix('relatorios')->name('relatorios.')->middleware('perfil:admin,secretario,tecnico')->group(function () {
+        Route::get('/',        [RelatorioController::class, 'index'])->name('index');
+        Route::get('/preview', [RelatorioController::class, 'preview'])->name('preview');
+        Route::get('/pdf',     [RelatorioController::class, 'exportarPdf'])->name('pdf');
+        Route::get('/excel',   [RelatorioController::class, 'exportarExcel'])->name('excel');
+    });
 
     // ───────────────────────────────────────────────────────────
     // 📊 DASHBOARD
@@ -62,11 +73,15 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('perfil:admin,tecnico')->group(function () {
             Route::get('/{obra}/editar', [ObraController::class, 'edit'])->name('edit');
             Route::put('/{obra}/atualizar', [ObraController::class, 'update'])->name('update');
-             Route::put('/{obra}/convenios/sync', [ObraController::class, 'syncConvenios'])->name('convenios.sync');
+            Route::put('/{obra}/convenios/sync', [ObraController::class, 'syncConvenios'])->name('convenios.sync');
         });
 
         // 👁️ VISUALIZAÇÃO (SEMPRE POR ÚLTIMO)
         Route::get('/visualizar/{obra}', [ObraController::class, 'show'])->name('show');
+
+        // 📈 GRÁFICO DE EVOLUÇÃO (JSON — Fase 4)
+        Route::get('/visualizar/{obra}/grafico', [ObraController::class, 'grafico'])
+            ->name('grafico');
 
         // 🗑️ EXCLUSÃO
         Route::middleware('perfil:admin')->group(function () {
