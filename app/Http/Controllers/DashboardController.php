@@ -5,36 +5,143 @@ namespace App\Http\Controllers;
 use App\Models\Obra;
 use App\Models\Convenio;
 use App\Models\Contrato;
+use App\Models\ExecucaoObra;
 use App\Models\StatusObra;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request): View
     {
-        // ── Totalizadores para os cards ───────────────────────────
+        // ── Filtro de período ─────────────────────────────────────
+        $periodoInicio = $request->filled('inicio')
+            ? Carbon::parse($request->inicio)->startOfDay()
+            : Carbon::now()->subMonths(12)->startOfDay();
+
+        $periodoFim = $request->filled('fim')
+            ? Carbon::parse($request->fim)->endOfDay()
+            : Carbon::now()->endOfDay();
+
+        // ── KPIs principais ───────────────────────────────────────
         $totalObras      = Obra::count();
-        $obrasEmExecucao = Obra::whereHas('status', fn($q) => $q->where('nome', 'Em Execução'))->count();
-        $obrasConcluidas = Obra::whereHas('status', fn($q) => $q->where('nome', 'Concluída'))->count();
+        $obrasEmExecucao = Obra::whereHas('status', fn($q) => $q->where('nome', 'like', '%Execu%'))->count();
+        $obrasConcluidas = Obra::whereHas('status', fn($q) => $q->where('nome', 'like', '%Conclu%'))->count();
         $totalConvenios  = Convenio::count();
 
-        // ── Obras por status (para o gráfico de barras) ───────────
+        // ── Financeiro global ─────────────────────────────────────
+        $valorTotalContratado = Contrato::sum('valor_contrato');
+        $valorTotalMedido     = ExecucaoObra::sum('valor_medido');
+        $saldoGlobal          = max($valorTotalContratado - $valorTotalMedido, 0);
+        $percentualGlobal     = $valorTotalContratado > 0
+            ? min(($valorTotalMedido / $valorTotalContratado) * 100, 100)
+            : 0;
+
+        // ── Obras por status (gráfico pizza) ──────────────────────
         $obrasPorStatus = StatusObra::withCount('obras')
             ->orderBy('ordem')
             ->get();
 
-        // ── Últimas 8 obras cadastradas ───────────────────────────
+        // ── Execução financeira por mês (gráfico barras) ──────────
+        // Agrupa valor_medido por mês nos últimos 12 meses
+        $execucaoPorMes = ExecucaoObra::select(
+            DB::raw('YEAR(data_medicao) as ano'),
+            DB::raw('MONTH(data_medicao) as mes'),
+            DB::raw('SUM(valor_medido) as total')
+        )
+            ->whereBetween('data_medicao', [$periodoInicio, $periodoFim])
+            ->groupBy('ano', 'mes')
+            ->orderBy('ano')
+            ->orderBy('mes')
+            ->get()
+            ->map(fn($r) => [
+                'label' => Carbon::createFromDate($r->ano, $r->mes, 1)->translatedFormat('M/y'),
+                'total' => (float) $r->total,
+            ]);
+
+        // ── ALERTAS ───────────────────────────────────────────────
+
+        // Contratos vencidos
+        $contratosVencidos = Contrato::with(['obra'])
+            ->whereNotNull('vigencia_contrato')
+            ->where('vigencia_contrato', '<', now())
+            ->orderBy('vigencia_contrato')
+            ->take(10)
+            ->get();
+
+        // Contratos vencendo em até 30 dias
+        $contratosVencendo = Contrato::with(['obra'])
+            ->whereNotNull('vigencia_contrato')
+            ->whereBetween('vigencia_contrato', [now(), now()->addDays(30)])
+            ->orderBy('vigencia_contrato')
+            ->take(10)
+            ->get();
+
+        // Convênios vencidos
+        $conveniosVencidos = Convenio::whereNotNull('vigencia')
+            ->where('vigencia', '<', now())
+            ->orderBy('vigencia')
+            ->take(10)
+            ->get();
+
+        // Convênios vencendo em até 60 dias
+        $conveniosVencendo = Convenio::whereNotNull('vigencia')
+            ->whereBetween('vigencia', [now(), now()->addDays(60)])
+            ->orderBy('vigencia')
+            ->take(10)
+            ->get();
+
+        // Obras sem medição nos últimos 60 dias (em execução)
+        $obrasSemMedicaoRecente = Obra::with(['status', 'contratos'])
+            ->whereHas('status', fn($q) => $q->where('nome', 'like', '%Execu%'))
+            ->whereDoesntHave('contratos.execucoes', function ($q) {
+                $q->where('data_medicao', '>=', now()->subDays(60));
+            })
+            ->whereHas('contratos') // só obras com contrato
+            ->take(8)
+            ->get();
+
+        // ── Últimas obras cadastradas ─────────────────────────────
         $ultimasObras = Obra::with(['status', 'contratos'])
             ->latest()
             ->take(8)
             ->get();
 
+        // ── Total de alertas para badge ───────────────────────────
+        $totalAlertas = $contratosVencidos->count()
+            + $contratosVencendo->count()
+            + $conveniosVencidos->count()
+            + $conveniosVencendo->count()
+            + $obrasSemMedicaoRecente->count();
+
         return view('dashboard', compact(
+            // KPIs
             'totalObras',
             'obrasEmExecucao',
             'obrasConcluidas',
             'totalConvenios',
+            // Financeiro
+            'valorTotalContratado',
+            'valorTotalMedido',
+            'saldoGlobal',
+            'percentualGlobal',
+            // Gráficos
             'obrasPorStatus',
+            'execucaoPorMes',
+            // Alertas
+            'contratosVencidos',
+            'contratosVencendo',
+            'conveniosVencidos',
+            'conveniosVencendo',
+            'obrasSemMedicaoRecente',
+            'totalAlertas',
+            // Listagem
             'ultimasObras',
+            // Filtro
+            'periodoInicio',
+            'periodoFim',
         ));
     }
 }
