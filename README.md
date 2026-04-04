@@ -1,64 +1,73 @@
-# 🏗️ Sistema de Acompanhamento de Obras
+# 🏗️ Sistema de Acompanhamento de Obras Públicas
 
-## Prefeitura Municipal de Rio Grande da Serra — SP
+**Prefeitura Municipal de Rio Grande da Serra — SP**
 
-Sistema web desenvolvido em Laravel para centralizar e acompanhar todas as obras municipais, convênios, contratos e execuções financiadas por recursos próprios ou repasses estaduais e federais.
+Sistema web desenvolvido em Laravel 12 para centralizar e acompanhar todas as obras municipais, convênios, contratos, medições de execução e documentos financiados por recursos próprios ou repasses estaduais e federais.
 
 ---
 
 ## 🎯 Objetivos
 
-- Centralizar o cadastro de obras municipais (em planejamento, execução e concluídas)
-- Registrar convênios e seus respectivos órgãos financiadores
-- Controlar contratos de licitação vinculados a cada obra
-- Acompanhar o percentual de execução por meio de registros de medição
-- Permitir o anexo de documentos (contratos, ART, fotos, atas) a obras e contratos
-- Oferecer painel visual com indicadores (KPIs) para gestão municipal
-- Controlar acesso por perfil de usuário (admin, técnico, operador)
+- Centralizar o cadastro de obras municipais em qualquer fase (planejamento, execução, concluída)
+- Registrar convênios, categorias e órgãos financiadores com vínculo direto às obras
+- Controlar contratos de licitação com empresa, valor, prazo e alertas de vigência
+- Acompanhar execução financeira por medições com cálculo automático de saldo e percentual
+- Registrar responsáveis por medição (engenheiro, fiscal, supervisor) para fins de auditoria
+- Anexar documentos (boletins, fotos, planilhas, contratos, atas) a obras e medições
+- Oferecer painel visual com KPIs para gestão municipal
+- Controlar acesso por perfil de usuário (admin, técnico, secretário, operador)
 
 ---
 
 ## 🚀 Tecnologias
 
 | Camada         | Tecnologia                             |
-| -------------- | -------------------------------------- |
+|----------------|----------------------------------------|
 | Backend        | PHP 8.2 + Laravel 12                   |
 | Frontend       | Blade + Tailwind CSS v3 + Alpine.js v3 |
 | Banco de dados | MySQL 8                                |
 | Build          | Vite + Laravel Vite Plugin             |
 | Autenticação   | Laravel Breeze                         |
+| Storage        | Laravel Storage (disco `public`)       |
 
 ---
 
-## 📦 Módulos da Fase 1
+## ✅ Fase 1 — Concluída
 
 ### 🏗️ Obras
+Entidade central do sistema. Cada obra possui descrição, endereço, processo de execução, status colorido, vínculo N:M com convênios e demanda de origem. A tela de detalhe (`obras.show`) centraliza todas as informações em abas: Geral, Convênios, Contratos, Execuções e Documentos. KPIs de valor medido, saldo, percentual executado, contratos e convênios são calculados dinamicamente via accessors no model — sem colunas extras na tabela.
 
-Entidade central do sistema. Cada obra possui descrição, endereço, processo de execução, status, vínculo com convênios e demanda de origem.
-
-### 📄 Convênios
-
-Instrumentos jurídicos entre a prefeitura e os órgãos financiadores. Um convênio pode financiar várias obras (N:M via tabela `obra_convenio`).
+### 🤝 Convênios
+Instrumentos jurídicos entre a prefeitura e órgãos financiadores. Um convênio pode financiar várias obras (N:M via pivot `obra_convenio`). Gerenciamento de vínculos com obras feito por tela dedicada com checkboxes, filtro inline e desvínculo individual. Alertas visuais de vigência vencida ou próxima do vencimento.
 
 ### 📋 Contratos
-
-Cada obra pode ter um ou mais contratos de licitação, vinculando a obra a uma empresa contratada com valor, prazo e número do processo.
+Cada obra pode ter um ou mais contratos vinculando a obra a uma empresa contratada, com valor, prazo, processo de licitação e vigência. Alertas de vencimento em 30 dias ou expirado. Modal de criação rápida de empresa diretamente no formulário de contrato para não interromper o fluxo do usuário.
 
 ### 📊 Execuções (Medições)
-
-Registro histórico das medições de execução de cada contrato — data, valor medido, saldo contratual e percentual executado acumulado.
+Registro histórico das medições de cada contrato. Ao informar o valor, o sistema calcula automaticamente saldo contratual e percentual executado acumulado — sem entrada manual. O formulário exibe em tempo real a prévia do novo saldo e percentual com barra de progresso animada. Alerta quando o valor ultrapassa o saldo disponível. Cada medição suporta múltiplos responsáveis com papel definido (engenheiro, fiscal, supervisor) e múltiplos documentos anexos.
 
 ### 📎 Documentos
+Upload de arquivos (PDF, imagens, planilhas, Word) com até 20 MB por arquivo e até 10 arquivos por envio, via drag-and-drop ou seleção. Documentos são vinculados polimorficamente a obras ou medições. A aba Documentos da obra exibe tudo separado por origem: documentos diretos da obra e documentos de cada medição agrupados por data. Download e exclusão (somente admin) disponíveis em ambas as origens.
 
-Upload de arquivos (PDF, imagens, planilhas) vinculados a obras, convênios ou contratos via relação polimórfica.
+### 🏢 Empresas
+CRUD completo de empresas contratadas com máscara de CNPJ, telefone e validação de unicidade. Proteção contra exclusão de empresa com contratos vinculados — verificação no controller antes de qualquer tentativa de deleção.
+
+### ⚙️ Área Admin
+CRUDs de: Usuários (com ativar/inativar), Empresas, Status de Obras, Categorias de Convênio, Órgãos Financiadores e Demandas/Propostas. Acesso restrito ao perfil `admin`.
 
 ### 👥 Usuários e Perfis
+Quatro perfis de acesso com middleware `CheckPerfil`:
 
-Três perfis de acesso: **admin** (acesso total), **tecnico** (criar e editar), **operador** (somente leitura).
+| Perfil       | Permissões                                                          |
+|--------------|---------------------------------------------------------------------|
+| `admin`      | CRUD completo, exclusões, gerenciamento de usuários e tabelas admin |
+| `tecnico`    | Criar e editar obras, contratos, medições e documentos              |
+| `secretario` | Mesmo acesso do técnico, pode ser responsável por medições          |
+| `operador`   | Somente leitura                                                     |
 
 ---
 
-## 🗄️ Estrutura do Banco de Dados
+## 🗄️ Banco de Dados
 
 ```
 users
@@ -69,10 +78,11 @@ empresas
 demandas_propostas
 obras
 convenios
-obra_convenio          ← pivot N:M
+obra_convenio              ← pivot N:M obras ↔ convênios
 contratos
 execucao_obras
-documentos
+execucao_responsaveis      ← pivot medição ↔ usuário (com campo papel)
+documentos                 ← polimórfico: obras, contratos, execucao_obras
 ```
 
 ---
@@ -105,10 +115,10 @@ DB_DATABASE=prefeitura
 DB_USERNAME=root
 DB_PASSWORD=sua_senha
 
-# 5. Rodar migrations e seeders
+# 5. Rodar migrations
 php artisan migrate --seed
 
-# 6. Criar link de storage (para uploads)
+# 6. Criar link de storage (uploads)
 php artisan storage:link
 
 # 7. Instalar dependências JS e compilar
@@ -116,12 +126,10 @@ npm install
 npm run dev
 ```
 
-### Rodando o servidor
-
-Abra **dois terminais**:
+### Servidor de desenvolvimento
 
 ```bash
-# Terminal 1 — assets (manter rodando durante o desenvolvimento)
+# Terminal 1 — assets (manter rodando)
 npm run dev
 
 # Terminal 2 — servidor Laravel
@@ -134,37 +142,17 @@ Acesse: [http://localhost:8000](http://localhost:8000)
 
 ## 👤 Usuários padrão (seeders)
 
-| E-mail                       | Senha          | Perfil   |
-| ---------------------------- | -------------- | -------- |
-| admin@riogrande.sp.gov.br    | Admin@2024!    | admin    |
-| tecnico@riogrande.sp.gov.br  | Tecnico@2024!  | tecnico  |
-| operador@riogrande.sp.gov.br | Operador@2024! | operador |
+| E-mail                        | Senha           | Perfil    |
+|-------------------------------|-----------------|-----------|
+| admin@riogrande.sp.gov.br     | Admin@2024!     | admin     |
+| tecnico@riogrande.sp.gov.br   | Tecnico@2024!   | tecnico   |
+| operador@riogrande.sp.gov.br  | Operador@2024!  | operador  |
 
 > ⚠️ Altere as senhas após o primeiro acesso em produção.
 
 ---
 
-## 🔐 Controle de Acesso
-
-O middleware `CheckPerfil` protege as rotas por perfil:
-
-```php
-// Apenas admin e técnico podem criar/editar
-Route::middleware('perfil:admin,tecnico')->group(function () { ... });
-
-// Apenas admin pode excluir
-Route::middleware('perfil:admin')->group(function () { ... });
-```
-
-| Perfil     | Permissões                                                     |
-| ---------- | -------------------------------------------------------------- |
-| `admin`    | CRUD completo, gerenciamento de usuários e tabelas de apoio    |
-| `tecnico`  | Criar e editar obras, contratos, medições e documentos         |
-| `operador` | Somente leitura (visualização de obras, convênios e contratos) |
-
----
-
-## 📁 Estrutura de Arquivos Relevantes
+## 📁 Estrutura de Arquivos
 
 ```
 app/
@@ -177,15 +165,21 @@ app/
 │   │   ├── ExecucaoObraController.php
 │   │   ├── DocumentoController.php
 │   │   └── Admin/
+│   │       ├── UsuarioController.php
+│   │       ├── EmpresaController.php
+│   │       ├── StatusObraController.php
+│   │       ├── CategoriaConvenioController.php
+│   │       ├── OrgaoFinanciadorController.php
+│   │       └── DemandaPropostaController.php
 │   └── Middleware/
 │       └── CheckPerfil.php
 ├── Models/
 │   ├── User.php
-│   ├── Obra.php
+│   ├── Obra.php               ← accessors: valor_medido, saldo_contratual, percentual_executado
 │   ├── Convenio.php
-│   ├── Contrato.php
-│   ├── ExecucaoObra.php
-│   ├── Documento.php
+│   ├── Contrato.php           ← estaVencido(), venceEm()
+│   ├── ExecucaoObra.php       ← responsaveis (pivot), documentos (polimórfico)
+│   ├── Documento.php          ← polimórfico, deleta arquivo físico no boot
 │   ├── StatusObra.php
 │   ├── CategoriaConvenio.php
 │   ├── OrgaoFinanciador.php
@@ -194,51 +188,61 @@ app/
 database/
 ├── migrations/
 └── seeders/
-resources/
-├── views/
-│   ├── layouts/app.blade.php
-│   ├── dashboard.blade.php
-│   ├── components/
-│   └── obras/
+resources/views/
+├── layouts/app.blade.php
+├── dashboard.blade.php
+├── obras/
+├── convenios/
+│   └── vincular-obras.blade.php
+├── contratos/
+├── execucoes/
+├── admin/
+│   ├── usuarios/
+│   └── empresas/
+└── components/
 routes/
 └── web.php
 ```
 
 ---
 
-## 🧩 Componentes Blade
-
-| Componente                                    | Uso                                 |
-| --------------------------------------------- | ----------------------------------- |
-| `<x-badge-status :status="$obra->status" />`  | Badge colorido com o status da obra |
-| `<x-card-stat titulo="..." valor="..." />`    | Card de KPI para o dashboard        |
-| `<x-form-input name="..." label="..." />`     | Input com validação automática      |
-| `<x-form-select name="..." :options="..." />` | Select com validação automática     |
-| `<x-confirm-delete :action="..." />`          | Modal de confirmação de exclusão    |
-
----
-
 ## 🗺️ Rotas principais
 
 ```
-GET    /                               → dashboard
-GET    /obras                          → obras.index
-GET    /obras/{obra}                   → obras.show
-GET    /obras/criar                    → obras.create
-POST   /obras                          → obras.store
-GET    /obras/{obra}/editar            → obras.edit
-PUT    /obras/{obra}                   → obras.update
-DELETE /obras/{obra}                   → obras.destroy
+GET|POST   /obras                                        obras.index / store
+GET        /obras/criar                                  obras.create
+GET        /obras/visualizar/{obra}                      obras.show
+GET|PUT    /obras/{obra}/editar                          obras.edit / update
+DELETE     /obras/{obra}/excluir                         obras.destroy
 
-GET    /convenios                      → convenios.index
-GET    /contratos                      → contratos.index
+GET|POST   /obras/{obra}/execucoes/criar                 obras.execucoes.create / store
+GET|PUT    /obras/{obra}/execucoes/{ex}/editar           obras.execucoes.edit / update
+DELETE     /obras/{obra}/execucoes/{ex}/excluir          obras.execucoes.destroy
+GET        /obras/{obra}/execucoes/{ex}/documentos/{d}/download
+DELETE     /obras/{obra}/execucoes/{ex}/documentos/{d}
 
-POST   /obras/{obra}/documentos        → obras.documentos.store
-GET    /obras/{obra}/documentos/{doc}/download
+POST       /obras/{obra}/documentos/upload               obras.documentos.store
+GET        /obras/{obra}/documentos/{d}/download         obras.documentos.download
+DELETE     /obras/{obra}/documentos/{d}/excluir          obras.documentos.destroy
 
-/admin/usuarios
-/admin/empresas
-/admin/status-obras
+GET|POST   /convenios                                    convenios.index / store
+GET        /convenios/criar                              convenios.create
+GET        /convenios/visualizar/{convenio}              convenios.show
+GET|PUT    /convenios/{convenio}/editar                  convenios.edit / update
+DELETE     /convenios/{convenio}/excluir                 convenios.destroy
+GET        /convenios/{convenio}/obras                   convenios.obras
+POST       /convenios/{convenio}/obras/vincular          convenios.vincular-obras
+DELETE     /convenios/{convenio}/obras/{obra}            convenios.desvincular-obra
+
+GET|POST   /contratos                                    contratos.index / store
+GET        /contratos/criar                              contratos.create
+GET        /contratos/visualizar/{contrato}              contratos.show
+GET|PUT    /contratos/{contrato}/editar                  contratos.edit / update
+DELETE     /contratos/{contrato}/excluir                 contratos.destroy
+
+/admin/usuarios          (CRUD + toggle ativo)
+/admin/empresas          (CRUD)
+/admin/status-obras      (CRUD)
 /admin/categorias-convenio
 /admin/orgaos-financiadores
 /admin/demandas-propostas
@@ -246,182 +250,50 @@ GET    /obras/{obra}/documentos/{doc}/download
 
 ---
 
-# 📋 Roadmap — Próximas Fases
+## 📋 Roadmap
 
-## ✅ Fase 1 — Base do sistema
-
-### 🏗️ Obras
-
-Entidade central do sistema. Cada obra possui descrição, endereço, processo de execução, status, vínculo com convênios e demanda de origem.
-
-### 📄 Convênios
-
-Instrumentos jurídicos entre a prefeitura e os órgãos financiadores. Um convênio pode financiar várias obras (N:M via tabela `obra_convenio`).
-
-### 📋 Contratos
-
-Cada obra pode ter um ou mais contratos de licitação, vinculando a obra a uma empresa contratada com valor, prazo e número do processo.
-
-### 📊 Execuções (Medições)
-
-Registro histórico das medições de execução de cada contrato — data, valor medido, saldo contratual e percentual executado acumulado.
-
-### 📎 Documentos
-
-Upload de arquivos (PDF, imagens, planilhas) vinculados a obras, convênios ou contratos via relação polimórfica.
-
-### 👥 Usuários e Perfis
-
-Três perfis de acesso: **admin** (acesso total), **tecnico** (criar e editar), **operador** (somente leitura).
+### ✅ Fase 1 — Base do sistema *(concluída)*
+CRUD completo de obras, convênios, contratos, medições, empresas, usuários e documentos. Fluxo guiado, KPIs, controle de acesso por perfil e upload polimórfico de arquivos.
 
 ---
 
-### 🔧 Fase 2 — Views de Convênios, Contratos e área Admin completa
-
-Objetivo: completar todas as telas de CRUD que ainda não possuem views, tornando o sistema totalmente operacional para uso diário.
-
-**Convênios**
-
-- Listagem com filtros por órgão financiador, categoria e período de vigência
-- Formulário de criação e edição com campos: número, descrição, categoria, órgão, valor de repasse, data de assinatura, vigência e número PRESCON
-- Tela de detalhe mostrando obras vinculadas e documentos anexados
-
-**Contratos**
-
-- Listagem com filtros por obra e empresa
-- Formulário de criação e edição com vinculação à obra e à empresa contratada
-- Tela de detalhe com histórico de medições e linha do tempo de execução
-
-**Área Admin**
-
-- CRUD de Usuários com ativação/inativação e redefinição de senha
-- CRUD de Empresas contratadas
-- CRUD de Status de Obras com definição de cor e ordem de exibição
-- CRUD de Categorias de Convênio
-- CRUD de Órgãos Financiadores com classificação por esfera (federal, estadual, municipal)
-- CRUD de Demandas e Propostas com controle de situação
+### 🔧 Fase 2 — Dashboard e indicadores consolidados
+- Painel com totalizadores: obras por status, valor total contratado vs. medido, contratos vencendo
+- Gráficos de pizza (obras por status) e barras (execução financeira por mês)
+- Lista de alertas: vigências próximas do vencimento, contratos sem medição recente
+- Filtro por período no dashboard
 
 ---
 
 ### 📊 Fase 3 — Relatórios exportáveis (PDF e Excel)
-
-Objetivo: oferecer aos gestores relatórios prontos para apresentações, auditorias e prestações de contas.
-
-**Relatórios previstos**
-
-- **Por status:** lista todas as obras agrupadas por status com totalizadores
-- **Por período:** obras cadastradas ou atualizadas em um intervalo de datas
-- **Por órgão financiador:** obras e valores agrupados por órgão e esfera de governo
-- **Por empresa contratada:** contratos e valores por empresa, com situação de cada contrato
-- **Execução financeira:** valor total contratado vs. valor medido vs. saldo, por obra ou por período
-- **Obras com vigência próxima do vencimento:** alerta de contratos vencendo nos próximos 30/60/90 dias
-
-**Tecnologia**
-
-- PDF via [barryvdh/laravel-dompdf](https://github.com/barryvdh/laravel-dompdf) com templates Blade
-- Excel via [maatwebsite/laravel-excel](https://laravel-excel.com/) com formatação de células e cabeçalhos
-- Filtros de período, status e órgão diretamente na tela antes de exportar
-
-```bash
-composer require barryvdh/laravel-dompdf
-composer require maatwebsite/excel
-```
+- Por status, por período, por órgão financiador, por empresa contratada
+- Execução financeira: contratado × medido × saldo por obra ou período
+- Obras com contratos vencendo nos próximos 30/60/90 dias
+- PDF via `barryvdh/laravel-dompdf`, Excel via `maatwebsite/laravel-excel`
 
 ---
 
-### 📈 Fase 4 — Gráfico de evolução por medição na tela de detalhe da obra
-
-Objetivo: tornar visível o progresso financeiro e físico de cada obra ao longo do tempo.
-
-**Funcionalidades**
-
-- Gráfico de linha (Chart.js) na tela `obras.show` mostrando a evolução do percentual executado a cada medição registrada
-- Gráfico de barras comparando valor contratado × valor medido acumulado × saldo contratual
-- Tabela detalhada de todas as medições com data, valor, percentual e observações
-- Indicador visual de progresso (barra horizontal) no card de resumo da obra
-- Alerta automático quando o percentual executado ultrapassar 90% do valor contratado
-
-**Dados exibidos por obra**
-
-- Data da primeira e da última medição
-- Total medido acumulado em R$
-- Percentual executado atual
-- Saldo contratual restante
+### 📈 Fase 4 — Gráfico de evolução por obra
+- Gráfico de linha (Chart.js) com evolução do percentual executado por medição
+- Gráfico de barras: valor contratado × medido acumulado × saldo
 - Projeção de conclusão baseada no ritmo das últimas medições
 
-**Tecnologia**
+---
 
-- [Chart.js v4](https://www.chartjs.org/) já incluso no projeto via CDN
-- Dados passados pelo controller como JSON via `@json()` no Blade
-- Nenhuma dependência adicional necessária
+### 🗺️ Fase 5 — Mapa de obras
+- Marcadores coloridos por status sobre OpenStreetMap (Leaflet.js, sem API key)
+- Geocodificação automática pelo endereço via Nominatim
+- Clique no marcador abre popup com resumo e link para o detalhe
+- Migration adicional: `latitude` e `longitude` na tabela `obras`
 
 ---
 
-### 🗺️ Fase 5 — Mapa de obras integrado
-
-Objetivo: permitir visualização geográfica de todas as obras do município em um mapa interativo.
-
-**Funcionalidades**
-
-- Mapa interativo na tela de listagem de obras com marcadores coloridos por status
-- Clique no marcador abre um popup com nome, status, endereço e link para o detalhe da obra
-- Filtro por status diretamente no mapa (ex: exibir apenas obras em execução)
-- Visualização por bairro ou região com agrupamento de marcadores (cluster)
-- Campos de latitude e longitude adicionados ao cadastro de obra com geocodificação automática pelo endereço
-
-**Migration adicional**
-
-```php
-// Adicionar à tabela obras
-$table->decimal('latitude', 10, 7)->nullable();
-$table->decimal('longitude', 10, 7)->nullable();
-```
-
-**Tecnologia**
-
-- [Leaflet.js](https://leafletjs.com/) com tiles do OpenStreetMap — gratuito, sem necessidade de API key
-- Plugin [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster) para agrupamento de marcadores
-- Geocodificação via API do Nominatim (OpenStreetMap) ou Google Geocoding API
-- Alternativa paga: Google Maps JavaScript API
-
----
-
-### 🌐 Fase 6 — Portal público de consulta de obras
-
-Objetivo: oferecer à população de Rio Grande da Serra uma página pública para consultar as obras do município, promovendo transparência e controle social em conformidade com a Lei de Acesso à Informação (LAI — Lei nº 12.527/2011).
-
-**Funcionalidades**
-
-- Página pública acessível sem autenticação em rota separada (`/portal` ou `/obras-publicas`)
-- Listagem de obras com filtros por status, bairro e categoria de convênio
-- Tela de detalhe de cada obra exibindo: descrição, localização, status, órgão financiador, valor contratado, percentual executado e documentos públicos anexados
-- Barra de progresso visual do percentual executado
-- Mapa com a localização da obra (integração com a Fase 5)
-- Campo de busca por endereço ou nome da obra
-- Seção de transparência com valor total investido em obras por ano e por órgão financiador
-
-**Segurança e separação de dados**
-
-- O portal exibe apenas obras e documentos marcados como `publico = true`
-- Dados sensíveis (usuários, processos internos, contratos sigilosos) nunca são expostos
-- Layout próprio e simplificado, sem sidebar de administração
-- Responsivo para acesso via celular pela população
-
-**Migration adicional**
-
-```php
-// Adicionar à tabela obras
-$table->boolean('publico')->default(false);
-
-// Adicionar à tabela documentos
-$table->boolean('publico')->default(false);
-```
-
-**Tecnologia**
-
-- Rotas sem middleware `auth`, protegidas apenas pelo escopo `publico`
-- Cache de consultas com `Cache::remember()` para melhorar a performance em acessos simultâneos
-- Possibilidade futura de API REST pública para integração com o portal oficial da prefeitura
+### 🌐 Fase 6 — Portal público de transparência
+- Página pública sem autenticação (`/portal`) para consulta pela população
+- Exibe apenas obras e documentos marcados como `publico = true`
+- Conformidade com a Lei de Acesso à Informação (LAI — Lei nº 12.527/2011)
+- Cache com `Cache::remember()` para suportar acessos simultâneos
+- Migration adicional: campo `publico` nas tabelas `obras` e `documentos`
 
 ---
 
