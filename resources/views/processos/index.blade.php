@@ -77,6 +77,15 @@
                 @endforeach
             </select>
 
+            <select name="situacao" class="border rounded-lg px-4 py-2 text-sm">
+                <option value="">Aberto e arquivado</option>
+                @foreach (\App\Models\Processo::$situacoes as $valor => $label)
+                    <option value="{{ $valor }}" {{ request('situacao') == $valor ? 'selected' : '' }}>
+                        {{ $label }}
+                    </option>
+                @endforeach
+            </select>
+
             <div class="md:col-span-5 flex gap-2 justify-end">
                 <a href="{{ route('processos.index') }}" class="px-4 py-2 text-sm border rounded-lg text-slate-600">
                     Limpar

@@ -7,6 +7,9 @@ use App\Models\Convenio;
 use App\Models\Contrato;
 use App\Models\ExecucaoObra;
 use App\Models\StatusObra;
+use App\Models\FaseProcesso;
+use App\Models\Processo;
+use App\Models\TipoProcesso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -109,12 +112,48 @@ class DashboardController extends Controller
             ->take(8)
             ->get();
 
+        // ────────────────────────────────────────────────────────────
+        // 🗂️ PROCESSOS ADMINISTRATIVOS (Fase 7.5)
+        // ────────────────────────────────────────────────────────────
+
+        // ── KPIs ────────────────────────────────────────────────────
+        $totalProcessos       = Processo::count();
+        $processosAbertos     = Processo::where('situacao', Processo::SITUACAO_ABERTO)->count();
+        $processosArquivados  = Processo::where('situacao', Processo::SITUACAO_ARQUIVADO)->count();
+        $processosAClassificar = Processo::whereHas('faseAtual', fn($q) => $q->where('nome', 'A Classificar'))->count();
+
+        // ── Processos por fase (gráfico pizza — resposta direta ao pedido do Secretário) ──
+        $processosPorFase = FaseProcesso::withCount('processos')
+            ->orderBy('ordem')
+            ->get();
+
+        // ── Processos por tipo (gráfico barras horizontal) ─────────
+        $processosPorTipo = TipoProcesso::withCount('processos')
+            ->orderBy('ordem')
+            ->get();
+
+        // ── Processos com pendência — "parado, e por qual motivo" ──
+        $processosComPendencia = Processo::with(['tipoProcesso', 'faseAtual'])
+            ->where('situacao', Processo::SITUACAO_ABERTO)
+            ->whereNotNull('motivo_pendencia')
+            ->where('motivo_pendencia', '!=', '')
+            ->latest('updated_at')
+            ->take(10)
+            ->get();
+
+        // ── Últimos processos cadastrados ──────────────────────────
+        $ultimosProcessos = Processo::with(['tipoProcesso', 'faseAtual'])
+            ->latest()
+            ->take(8)
+            ->get();
+
         // ── Total de alertas para badge ───────────────────────────
         $totalAlertas = $contratosVencidos->count()
             + $contratosVencendo->count()
             + $conveniosVencidos->count()
             + $conveniosVencendo->count()
-            + $obrasSemMedicaoRecente->count();
+            + $obrasSemMedicaoRecente->count()
+            + $processosComPendencia->count();
 
         return view('dashboard', compact(
             // KPIs
@@ -142,6 +181,15 @@ class DashboardController extends Controller
             // Filtro
             'periodoInicio',
             'periodoFim',
+            // Processos administrativos
+            'totalProcessos',
+            'processosAbertos',
+            'processosArquivados',
+            'processosAClassificar',
+            'processosPorFase',
+            'processosPorTipo',
+            'processosComPendencia',
+            'ultimosProcessos',
         ));
     }
 }

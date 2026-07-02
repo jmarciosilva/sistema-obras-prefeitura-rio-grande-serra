@@ -22,6 +22,7 @@ class ProcessoController extends Controller
             ->when($request->tipo_processo_id, fn($q) => $q->where('tipo_processo_id', $request->tipo_processo_id))
             ->when($request->responsavel_tecnico_id, fn($q) => $q->where('responsavel_tecnico_id', $request->responsavel_tecnico_id))
             ->when($request->fase_atual_id, fn($q) => $q->where('fase_atual_id', $request->fase_atual_id))
+            ->when($request->situacao, fn($q) => $q->where('situacao', $request->situacao))
             ->when($request->endereco, fn($q) => $q->where(function ($q) use ($request) {
                 $q->where('endereco', 'like', "%{$request->endereco}%")
                     ->orWhere('bairro', 'like', "%{$request->endereco}%")
