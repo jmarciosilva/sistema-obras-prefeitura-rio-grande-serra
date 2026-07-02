@@ -1,18 +1,23 @@
 @extends('layouts.app')
 
-@section('title', 'Relatórios')
-@section('subtitle', 'Exportação de dados em PDF e Excel')
+@section('title', 'Relatórios de Processos')
+@section('subtitle', 'Exportação de dados de Processos Administrativos em PDF e Excel')
 
 @section('content')
 
-<div x-data="relatorios()" class="space-y-6">
+<div x-data="relatoriosProcessos()" class="space-y-6">
 
     {{-- ═══════════════════════════════════════════════════════
     | HEADER
     ══════════════════════════════════════════════════════════ --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h1 class="text-xl font-semibold text-slate-800">📊 Relatórios</h1>
+            <div class="flex items-center gap-2 text-sm text-slate-600 mb-1">
+                <a href="{{ route('relatorios.index') }}" class="hover:text-slate-900">Relatórios</a>
+                <span>›</span>
+                <span class="text-slate-900 font-medium">Processos Administrativos</span>
+            </div>
+            <h1 class="text-xl font-semibold text-slate-800">🗂️ Relatórios de Processos</h1>
             <p class="text-sm text-slate-500 mt-0.5">Gere relatórios em PDF (com gráficos) ou planilha Excel.</p>
         </div>
         <button @click="ajuda = true"
@@ -25,11 +30,11 @@
     | SELETOR DE MÓDULO
     ══════════════════════════════════════════════════════════ --}}
     <div class="flex gap-2">
-        <span class="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white">🏗️ Obras</span>
-        <a href="{{ route('relatorios.processos.index') }}"
+        <a href="{{ route('relatorios.index') }}"
             class="px-4 py-2 text-sm font-medium rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition">
-            🗂️ Processos Administrativos
+            🏗️ Obras
         </a>
+        <span class="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white">🗂️ Processos Administrativos</span>
     </div>
 
     {{-- ═══════════════════════════════════════════════════════
@@ -37,24 +42,20 @@
     ══════════════════════════════════════════════════════════ --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <p class="text-xs text-slate-500">Total de Obras</p>
-            <p class="text-2xl font-bold text-slate-800 mt-1">{{ $totais['obras'] }}</p>
+            <p class="text-xs text-slate-500">Total de Processos</p>
+            <p class="text-2xl font-bold text-slate-800 mt-1">{{ $totais['processos'] }}</p>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <p class="text-xs text-slate-500">Contratos</p>
-            <p class="text-2xl font-bold text-slate-800 mt-1">{{ $totais['contratos'] }}</p>
+            <p class="text-xs text-slate-500">Abertos</p>
+            <p class="text-2xl font-bold text-green-700 mt-1">{{ $totais['abertos'] }}</p>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <p class="text-xs text-slate-500">Valor Contratado</p>
-            <p class="text-lg font-bold text-blue-700 mt-1">
-                R$ {{ number_format($totais['valor_contratado'], 0, ',', '.') }}
-            </p>
+            <p class="text-xs text-slate-500">Com Pendência</p>
+            <p class="text-2xl font-bold text-red-700 mt-1">{{ $totais['com_pendencia'] }}</p>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <p class="text-xs text-slate-500">Valor Medido</p>
-            <p class="text-lg font-bold text-green-700 mt-1">
-                R$ {{ number_format($totais['valor_medido'], 0, ',', '.') }}
-            </p>
+            <p class="text-xs text-slate-500">A Classificar</p>
+            <p class="text-2xl font-bold text-amber-700 mt-1">{{ $totais['a_classificar'] }}</p>
         </div>
     </div>
 
@@ -68,12 +69,11 @@
             <div class="flex flex-wrap gap-1 -mb-px">
                 @php
                 $tiposRelatorio = [
-                    'geral'       => ['icon' => '📋', 'label' => 'Geral',               'desc' => 'Todas as obras com KPIs'],
-                    'financeiro'  => ['icon' => '💰', 'label' => 'Execução Financeira', 'desc' => 'Contratado × Medido × Saldo'],
-                    'vencimento'  => ['icon' => '⏳', 'label' => 'Vencimentos',         'desc' => 'Contratos vencendo/vencidos'],
-                    'status'      => ['icon' => '🚦', 'label' => 'Por Status',           'desc' => 'Obras agrupadas por fase'],
-                    'empresa'     => ['icon' => '🏢', 'label' => 'Por Empresa',          'desc' => 'Ranking de empresas contratadas'],
-                    'orgao'       => ['icon' => '🏛️', 'label' => 'Por Órgão',           'desc' => 'Por órgão financiador'],
+                    'geral'           => ['icon' => '📋', 'label' => 'Geral',              'desc' => 'Todos os processos com fase e responsável'],
+                    'por_fase'        => ['icon' => '📍', 'label' => 'Por Fase',           'desc' => 'Agrupado por fase de tramitação'],
+                    'por_tipo'        => ['icon' => '🏷️', 'label' => 'Por Tipo',           'desc' => 'Agrupado por tipo de serviço'],
+                    'pendencias'      => ['icon' => '⚠️', 'label' => 'Pendências',         'desc' => 'Processos parados, com motivo registrado'],
+                    'por_responsavel' => ['icon' => '👷', 'label' => 'Por Responsável',    'desc' => 'Ranking por responsável técnico'],
                 ];
                 @endphp
 
@@ -94,22 +94,19 @@
             {{-- DESCRIÇÃO DA ABA ATIVA --}}
             <div class="mb-5 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700">
                 <template x-if="tipo === 'geral'">
-                    <span>📋 <strong>Relatório Geral:</strong> Lista todas as obras com status, endereço, valor contratado, medido, saldo e percentual de execução.</span>
+                    <span>📋 <strong>Relatório Geral:</strong> Lista todos os processos com número, requerente, tipo, fase atual, responsável técnico e situação.</span>
                 </template>
-                <template x-if="tipo === 'financeiro'">
-                    <span>💰 <strong>Execução Financeira:</strong> Compara o valor contratado × medido × saldo para cada obra, com barra de progresso visual no PDF.</span>
+                <template x-if="tipo === 'por_fase'">
+                    <span>📍 <strong>Por Fase:</strong> Quantidade de processos em cada fase de tramitação, com percentual do total.</span>
                 </template>
-                <template x-if="tipo === 'vencimento'">
-                    <span>⏳ <strong>Vencimentos:</strong> Lista contratos que vencerão nos próximos dias configurados, incluindo contratos já vencidos.</span>
+                <template x-if="tipo === 'por_tipo'">
+                    <span>🏷️ <strong>Por Tipo:</strong> Quantidade de processos por tipo de serviço (alvará, certidão, ofício etc.).</span>
                 </template>
-                <template x-if="tipo === 'status'">
-                    <span>🚦 <strong>Por Status:</strong> Agrupa obras por fase (Planejamento, Licitação, Execução, etc.) com gráfico de pizza no PDF.</span>
+                <template x-if="tipo === 'pendencias'">
+                    <span>⚠️ <strong>Pendências:</strong> Processos abertos com motivo de pendência registrado — exatamente os que precisam de atenção.</span>
                 </template>
-                <template x-if="tipo === 'empresa'">
-                    <span>🏢 <strong>Por Empresa:</strong> Ranking das empresas contratadas por valor total e número de contratos.</span>
-                </template>
-                <template x-if="tipo === 'orgao'">
-                    <span>🏛️ <strong>Por Órgão Financiador:</strong> Filtra obras vinculadas a um órgão específico (convênios).</span>
+                <template x-if="tipo === 'por_responsavel'">
+                    <span>👷 <strong>Por Responsável Técnico:</strong> Ranking de responsáveis técnicos por quantidade de processos vinculados.</span>
                 </template>
             </div>
 
@@ -119,66 +116,66 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
 
-                    {{-- STATUS --}}
+                    {{-- TIPO DE PROCESSO --}}
                     <div class="space-y-1">
-                        <label class="text-xs font-medium text-slate-600">Filtrar por Status</label>
-                        <select name="status_id"
+                        <label class="text-xs font-medium text-slate-600">Tipo de Processo</label>
+                        <select name="tipo_processo_id"
                             class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                            <option value="">Todos os status</option>
-                            @foreach ($statuses as $s)
-                                <option value="{{ $s->id }}">{{ $s->nome }}</option>
+                            <option value="">Todos os tipos</option>
+                            @foreach ($tiposProcesso as $t)
+                                <option value="{{ $t->id }}">{{ $t->nome }}</option>
                             @endforeach
                         </select>
                     </div>
 
-                    {{-- ÓRGÃO --}}
+                    {{-- FASE --}}
                     <div class="space-y-1">
-                        <label class="text-xs font-medium text-slate-600">Órgão Financiador</label>
-                        <select name="orgao_id"
+                        <label class="text-xs font-medium text-slate-600">Fase Atual</label>
+                        <select name="fase_atual_id"
                             class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                            <option value="">Todos os órgãos</option>
-                            @foreach ($orgaos as $o)
-                                <option value="{{ $o->id }}">{{ $o->nome }}</option>
+                            <option value="">Todas as fases</option>
+                            @foreach ($fasesProcesso as $f)
+                                <option value="{{ $f->id }}">{{ $f->nome }}</option>
                             @endforeach
                         </select>
                     </div>
 
-                    {{-- EMPRESA --}}
+                    {{-- RESPONSÁVEL --}}
                     <div class="space-y-1">
-                        <label class="text-xs font-medium text-slate-600">Empresa Contratada</label>
-                        <select name="empresa_id"
+                        <label class="text-xs font-medium text-slate-600">Responsável Técnico</label>
+                        <select name="responsavel_tecnico_id"
                             class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                            <option value="">Todas as empresas</option>
-                            @foreach ($empresas as $e)
-                                <option value="{{ $e->id }}">{{ $e->razao_social }}</option>
+                            <option value="">Todos os responsáveis</option>
+                            @foreach ($responsaveis as $r)
+                                <option value="{{ $r->id }}">{{ $r->nome }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- SITUAÇÃO --}}
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium text-slate-600">Situação</label>
+                        <select name="situacao"
+                            class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Aberto e arquivado</option>
+                            @foreach (\App\Models\Processo::$situacoes as $valor => $label)
+                                <option value="{{ $valor }}">{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
 
                     {{-- DATA INÍCIO --}}
                     <div class="space-y-1">
-                        <label class="text-xs font-medium text-slate-600">Período — Data Início</label>
+                        <label class="text-xs font-medium text-slate-600">Entrada — Data Início</label>
                         <input type="date" name="data_inicio"
                             class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
                     </div>
 
                     {{-- DATA FIM --}}
                     <div class="space-y-1">
-                        <label class="text-xs font-medium text-slate-600">Período — Data Fim</label>
+                        <label class="text-xs font-medium text-slate-600">Entrada — Data Fim</label>
                         <input type="date" name="data_fim"
                             class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    {{-- VENCIMENTO (só aparece no tipo vencimento) --}}
-                    <div class="space-y-1" x-show="tipo === 'vencimento'">
-                        <label class="text-xs font-medium text-slate-600">Alertar vencimentos em até</label>
-                        <select name="vencimento_dias"
-                            class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                            <option value="30">30 dias</option>
-                            <option value="60">60 dias</option>
-                            <option value="90">90 dias</option>
-                            <option value="180">180 dias</option>
-                        </select>
                     </div>
 
                 </div>
@@ -186,20 +183,17 @@
                 {{-- BOTÕES DE AÇÃO --}}
                 <div class="flex flex-wrap gap-3 pt-4 border-t border-slate-200">
 
-                    {{-- PRÉ-VISUALIZAR --}}
-                    <button type="submit" formaction="{{ route('relatorios.preview') }}"
+                    <button type="submit" formaction="{{ route('relatorios.processos.preview') }}"
                         class="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition">
                         👁 Pré-visualizar
                     </button>
 
-                    {{-- EXPORTAR PDF --}}
-                    <button type="submit" formaction="{{ route('relatorios.pdf') }}"
+                    <button type="submit" formaction="{{ route('relatorios.processos.pdf') }}"
                         class="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
                         📄 Exportar PDF
                     </button>
 
-                    {{-- EXPORTAR EXCEL --}}
-                    <button type="submit" formaction="{{ route('relatorios.excel') }}"
+                    <button type="submit" formaction="{{ route('relatorios.processos.excel') }}"
                         class="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
                         📊 Exportar Excel
                     </button>
@@ -221,29 +215,28 @@
         @php
         $atalhos = [
             [
-                'icon'  => '⏳',
-                'titulo'=> 'Contratos vencendo em 30 dias',
-                'desc'  => 'Exporta apenas os contratos com vigência nos próximos 30 dias.',
-                'tipo'  => 'vencimento',
-                'extra' => 'vencimento_dias=30',
+                'icon'  => '⚠️',
+                'titulo'=> 'Processos com pendência',
+                'desc'  => 'Só processos abertos com motivo de pendência registrado.',
+                'tipo'  => 'pendencias',
+                'cor'   => 'border-red-300 bg-red-50',
+                'btn'   => 'bg-red-600 hover:bg-red-700',
+            ],
+            [
+                'icon'  => '📍',
+                'titulo'=> 'Processos a classificar',
+                'desc'  => 'Processos importados sem fase estruturada definida.',
+                'tipo'  => 'geral',
+                'extra' => '',
                 'cor'   => 'border-amber-300 bg-amber-50',
                 'btn'   => 'bg-amber-500 hover:bg-amber-600',
             ],
             [
-                'icon'  => '💰',
-                'titulo'=> 'Execução financeira completa',
-                'desc'  => 'Contratado × medido × saldo de todas as obras sem filtro.',
-                'tipo'  => 'financeiro',
-                'extra' => '',
-                'cor'   => 'border-green-300 bg-green-50',
-                'btn'   => 'bg-green-600 hover:bg-green-700',
-            ],
-            [
                 'icon'  => '📋',
-                'titulo'=> 'Obras em execução',
-                'desc'  => 'Somente obras com status "Em Execução".',
+                'titulo'=> 'Processos abertos',
+                'desc'  => 'Todos os processos com situação "Aberto".',
                 'tipo'  => 'geral',
-                'extra' => 'status_id=3',
+                'extra' => 'situacao=aberto',
                 'cor'   => 'border-blue-300 bg-blue-50',
                 'btn'   => 'bg-blue-600 hover:bg-blue-700',
             ],
@@ -256,15 +249,15 @@
                 <h3 class="font-semibold text-slate-800 text-sm mb-1">{{ $a['titulo'] }}</h3>
                 <p class="text-xs text-slate-600 mb-4">{{ $a['desc'] }}</p>
                 <div class="flex gap-2">
-                    <a href="{{ route('relatorios.preview') }}?tipo={{ $a['tipo'] }}&{{ $a['extra'] }}"
+                    <a href="{{ route('relatorios.processos.preview') }}?tipo={{ $a['tipo'] }}&{{ $a['extra'] ?? '' }}"
                         class="px-3 py-1.5 text-xs rounded-lg text-slate-700 bg-white border border-slate-300 hover:bg-slate-50">
                         👁 Ver
                     </a>
-                    <a href="{{ route('relatorios.pdf') }}?tipo={{ $a['tipo'] }}&{{ $a['extra'] }}"
+                    <a href="{{ route('relatorios.processos.pdf') }}?tipo={{ $a['tipo'] }}&{{ $a['extra'] ?? '' }}"
                         class="px-3 py-1.5 text-xs rounded-lg text-white {{ $a['btn'] }}">
                         📄 PDF
                     </a>
-                    <a href="{{ route('relatorios.excel') }}?tipo={{ $a['tipo'] }}&{{ $a['extra'] }}"
+                    <a href="{{ route('relatorios.processos.excel') }}?tipo={{ $a['tipo'] }}&{{ $a['extra'] ?? '' }}"
                         class="px-3 py-1.5 text-xs rounded-lg text-white bg-green-600 hover:bg-green-700">
                         📊 Excel
                     </a>
@@ -281,7 +274,7 @@
 
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-5 rounded-t-2xl flex justify-between items-start">
                 <div>
-                    <h2 class="text-lg font-bold">📘 Como usar os Relatórios</h2>
+                    <h2 class="text-lg font-bold">📘 Como usar os Relatórios de Processos</h2>
                     <p class="text-sm opacity-80 mt-0.5">Guia completo do módulo de exportação</p>
                 </div>
                 <button @click="ajuda = false" class="text-white/70 hover:text-white text-2xl leading-none">×</button>
@@ -293,7 +286,7 @@
                     <span class="text-2xl">1️⃣</span>
                     <div>
                         <strong class="block text-slate-800 mb-1">Escolha o tipo de relatório</strong>
-                        Clique nas abas no topo do painel para selecionar o que deseja exportar: relatório geral, execução financeira, vencimentos, agrupamento por status, por empresa ou por órgão financiador.
+                        Geral, por fase, por tipo de serviço, pendências ou por responsável técnico.
                     </div>
                 </div>
 
@@ -301,37 +294,24 @@
                     <span class="text-2xl">2️⃣</span>
                     <div>
                         <strong class="block text-slate-800 mb-1">Aplique os filtros desejados</strong>
-                        Você pode combinar filtros: status da obra, órgão financiador, empresa contratada e período de medição. Deixe os campos em branco para incluir todos os registros.
-                    </div>
-                </div>
-
-                <div class="flex gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <span class="text-2xl">3️⃣</span>
-                    <div>
-                        <strong class="block text-slate-800 mb-1">Pré-visualize antes de exportar</strong>
-                        O botão <strong>👁 Pré-visualizar</strong> mostra exatamente o que será exportado. Use-o para conferir os dados antes de gerar o arquivo final.
+                        Combine tipo, fase, responsável técnico, situação e período de entrada. Deixe em branco para incluir todos os registros.
                     </div>
                 </div>
 
                 <div class="flex gap-3 p-4 bg-red-50 rounded-lg border border-red-100">
-                    <span class="text-2xl">4️⃣</span>
+                    <span class="text-2xl">3️⃣</span>
                     <div>
                         <strong class="block text-slate-800 mb-1">📄 Exportar PDF</strong>
-                        Gera um arquivo PDF em formato A4 paisagem com <strong>gráficos visuais</strong> (pizza de status, barras de execução financeira, evolução mensal). Ideal para apresentações e impressão.
+                        PDF em A4 paisagem com gráfico de distribuição por fase e tabelas formatadas.
                     </div>
                 </div>
 
                 <div class="flex gap-3 p-4 bg-green-50 rounded-lg border border-green-100">
-                    <span class="text-2xl">5️⃣</span>
+                    <span class="text-2xl">4️⃣</span>
                     <div>
                         <strong class="block text-slate-800 mb-1">📊 Exportar Excel</strong>
-                        Gera uma planilha com <strong>5 abas</strong>: Resumo, Obras, Execução Financeira, Contratos Vencendo e Por Empresa. Ideal para análise e cruzamento de dados.
+                        Planilha com 5 abas: Resumo, Processos, Por Fase, Por Tipo e Pendências.
                     </div>
-                </div>
-
-                <div class="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                    <strong class="block text-amber-800 mb-2">💡 Atalhos rápidos</strong>
-                    <p class="text-amber-700">Os três cartões abaixo do painel são atalhos para os relatórios mais comuns. Clique em PDF ou Excel diretamente sem precisar configurar filtros.</p>
                 </div>
 
             </div>
@@ -348,7 +328,7 @@
 </div>
 
 <script>
-function relatorios() {
+function relatoriosProcessos() {
     return {
         tipo: 'geral',
         ajuda: false,

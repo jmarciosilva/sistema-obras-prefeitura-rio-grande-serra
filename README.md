@@ -4,10 +4,13 @@
 
 Sistema web desenvolvido em Laravel 12 para centralizar e acompanhar todas as obras municipais, convênios, contratos, medições de execução e documentos financiados por recursos próprios ou repasses estaduais e federais.
 
+A partir da Fase 7, o sistema passou a cobrir também um segundo domínio, paralelo ao de Obras: o **licenciamento urbano** (alvarás, certidões, ligações de água/energia) tramitado pela Secretaria — ver [🗂️ Módulo Processos Administrativos](#-módulo-processos-administrativos-licenciamento-e-alvarás).
+
 ---
 
 ## 🎯 Objetivos
 
+**Obras públicas:**
 - Centralizar o cadastro de obras municipais em qualquer fase (planejamento, execução, concluída)
 - Registrar convênios, categorias e órgãos financiadores com vínculo direto às obras
 - Controlar contratos de licitação com empresa, valor, prazo e alertas de vigência
@@ -17,6 +20,11 @@ Sistema web desenvolvido em Laravel 12 para centralizar e acompanhar todas as ob
 - Oferecer painel visual com KPIs, gráficos de evolução e projeção de conclusão por obra
 - Exportar relatórios em PDF (com gráficos) e Excel (múltiplas abas)
 - Controlar acesso por perfil de usuário (admin, técnico, secretário, operador)
+
+**Processos administrativos (licenciamento):**
+- Dar visibilidade ao Secretário de Obras sobre em qual fase está cada processo — e, se parado, por quê
+- Substituir progressivamente o controle em planilha de texto livre por uma linha do tempo estruturada de trâmites
+- Importar o histórico de mais de 2.000 processos já em andamento, sem perder o texto original
 
 ---
 
@@ -33,6 +41,8 @@ Sistema web desenvolvido em Laravel 12 para centralizar e acompanhar todas as ob
 | Build          | Vite + Laravel Vite Plugin                          |
 | Autenticação   | Laravel Breeze                                      |
 | Storage        | Laravel Storage (disco `public`)                    |
+| Endereço (CEP) | API pública ViaCEP (`fetch` client-side, sem API key)|
+| Localização    | `lang/pt_BR/*` — mensagens de validação e paginação em português |
 
 ---
 
@@ -86,7 +96,7 @@ Painel central com visão consolidada de todas as obras do município:
 
 ## ✅ Fase 3 — Relatórios Exportáveis *(concluída)*
 
-M�dulo completo de geração de relatórios acessível em `/relatorios`:
+Módulo completo de geração de relatórios acessível em `/relatorios`:
 
 ### Tipos de relatório
 | Tipo | Conteúdo |
@@ -137,6 +147,71 @@ Calculada automaticamente a partir do ritmo das últimas 3 medições (R$/dia). 
 
 ---
 
+## 🗂️ Módulo Processos Administrativos (Licenciamento e Alvarás)
+
+Domínio novo, **paralelo** ao módulo de Obras (não é a mesma coisa: Obras é gestão de investimento público; Processos é licenciamento urbano — alvarás, certidões, ligações de água/luz). Reaproveita a infraestrutura já pronta: autenticação, perfis (`CheckPerfil`), layout, exportação PDF/Excel. Roadmap completo e diagnóstico do problema em [`roadmap-modulo-processos-administrativos.md`](./roadmap-modulo-processos-administrativos.md) — leia esse arquivo antes de mexer nesse módulo, ele documenta o "porquê" de cada decisão de modelagem.
+
+**Contexto de negócio, resumido:** a Secretaria de Obras controla os processos hoje numa planilha Excel em texto livre (`CONTROLE_PROCESSOS.xlsx`, 6 abas, mais de 2.000 processos ativos). O pedido central do Secretário é simples e específico: **saber em qual fase está cada processo e, se estiver parado, por qual motivo.** Esse pedido é o que orienta a arquitetura — `fase_atual_id` e `motivo_pendencia` em `processos` são os campos centrais do módulo, não um detalhe.
+
+### ✅ Fase 7.1 — Fundação, Fases do Processo e CRUD Essencial *(concluída)*
+
+CRUD completo de processos administrativos:
+
+- **Processo**: número, requerente, endereço (estruturado — ver abaixo), tipo de serviço, responsável técnico, data de entrada, fase atual, setor/caixa físicos, motivo de pendência, situação (aberto/arquivado)
+- **Trâmite**: linha do tempo de movimentações de um processo — mantém o hábito real de trabalho (texto livre) mas **exige escolher uma fase estruturada a cada lançamento**. É essa fase estruturada, atualizada a cada trâmite, que alimenta o dashboard e responde à pergunta do Secretário
+- **Tipo de Processo**: os 12 serviços formais descritos pela Secretaria (alvará de construção, reforma, demolição, movimentação de terra, regularização, habite-se, certidão de uso do solo, diretrizes urbanísticas, ligação de água/energia, desdobro/unificação/desmembramento, muro de contenção, manutenção de iluminação pública) + 1 tipo de fallback ("Outros / A Classificar") usado pelo importador da Fase 7.2
+- **Fase de Processo**: tabela de domínio (não enum fixo) com vocabulário inicial sugerido a partir do relato da cliente — **ainda não validado com as técnicas do Departamento de Obras Particulares**, ver seção 5 do roadmap
+- **Responsável Técnico**: cadastro próprio, com atalho de criação rápida em modal a partir do formulário de processo (igual ao padrão já usado para "Nova Empresa" em Contratos), sem precisar sair da tela
+
+**Endereço com busca por CEP**: ao digitar o CEP, busca automática via API pública ViaCEP (`fetch` client-side, sem custo de infraestrutura) preenchendo logradouro/bairro/cidade/UF. Número e complemento (apto, bloco, condomínio) são sempre manuais — a API não tem como saber esses dados. Accessor `endereco_completo` no model monta a linha única formatada para listagens e relatórios.
+
+**Validação em português:** `lang/pt_BR/validation.php` traduz as mensagens padrão do Laravel para todo o sistema (não só Processos) — o projeto usava `APP_LOCALE=en` desde o início, então toda mensagem de erro de validação aparecia em inglês apesar da interface ser 100% em português. `APP_FALLBACK_LOCALE` continua `en` para não quebrar telas sem tradução própria (ex.: mensagens de autenticação do Breeze).
+
+### ✅ Fase 7.2 — Importação do Histórico via Excel *(concluída)*
+
+Importador idempotente da planilha legada, cobrindo as 6 abas reais (`CONTROLE`, `ÁGUA E LUZ`, `DESMEMBRAMENTOS_ACIMA_DE_02_LOT`, `SISOBRA`, `DESARQUIVAMENTO`, `RENOVAÇÃO_DE_ALVARÁ`):
+
+- **Job em fila**: `App\Jobs\ImportarProcessosHistoricoJob` (`ShouldQueue`) + comando `php artisan processos:importar {caminho} {--sync}` (`--sync` roda na hora, sem precisar de worker — útil para testes locais)
+- **Idempotente**: reprocessar o mesmo arquivo não duplica nada — chave natural `processos.processo_numero_normalizado` e `tramites.importacao_ref`
+- **Classes auxiliares** em `App\Services\Importacao\`:
+  - `NumeroProcessoNormalizer` — normaliza número de processo para dedup/busca
+  - `TramiteCellParser` — interpreta célula de trâmite (número serial do Excel puro, texto livre com data embutida em qualquer posição, ou sem data nenhuma → fallback "data não informada")
+  - `TipoProcessoMatcher` — casa o texto livre da coluna ASSUNTO com um dos 12 tipos formais por palavra-chave; o que não bate cai em "Outros / A Classificar" — **deliberadamente não tenta categorizar 100% automaticamente**
+  - `ResponsavelTecnicoMatcher` — correspondência aproximada de nomes (limiar de 82% de similaridade, calibrado nos dados reais) para o problema real de grafias duplicadas (ex.: "PRISCILA DE JESUS GUERRA ANDRÉ" / "PRISCILA DE JESUS A. GUERRA")
+  - Erros são isolados por linha (log + segue para a próxima), não abortam a importação inteira
+
+> ⚠️ A planilha fonte (dados reais e sensíveis) **não fica no repositório** — salve em `storage/app/import/` (já no `.gitignore`) antes de rodar o comando.
+
+### ✅ Fase 7.5 (parcial) — Dashboard e Relatórios *(concluída)*
+
+**Dashboard executivo** (`/`, mesma tela do módulo de Obras): nova seção "Processos Administrativos" com KPIs de quantidade (total, abertos, arquivados, a classificar — cada card já linka para a listagem filtrada), gráfico de pizza por fase (a resposta visual direta ao pedido do Secretário), gráfico de barras por tipo de serviço, aba "Processos pendentes" no painel de alertas unificado (ao lado de contratos/convênios vencendo) e tabela de processos recentes.
+
+**Relatórios** (`/relatorios/processos`) — hub próprio, mesma infraestrutura (dompdf + maatwebsite/excel) e mesmo padrão visual do hub de Obras (`/relatorios`), com seletor de módulo para trocar entre os dois:
+
+| Tipo de relatório | Conteúdo |
+|---|---|
+| Geral | Todos os processos com tipo, fase, responsável e situação |
+| Por Fase | Quantidade e % por fase de tramitação |
+| Por Tipo | Quantidade e % por tipo de serviço |
+| Pendências | Processos abertos com motivo de pendência registrado |
+| Por Responsável | Ranking de responsáveis técnicos por quantidade de processos |
+
+Filtros: tipo de processo · fase atual · responsável técnico · situação · período de entrada. Exportação em **PDF** (A4 paisagem, gráfico de distribuição por fase, tabelas) e **Excel** (5 abas: Resumo, Processos, Por Fase, Por Tipo, Pendências).
+
+> ⚠️ **Nota técnica para quem mexer nisso depois:** a exportação em PDF limita a listagem completa a 500 linhas (`RelatorioProcessoController::LIMITE_LINHAS_PDF`) porque o dompdf estoura o limite de memória padrão do PHP (512 MB) em tabelas HTML muito grandes — descoberto rodando contra os ~2.275 processos reais importados na Fase 7.2. A exportação em Excel não tem esse limite (o `PhpSpreadsheet` lida bem com volume alto). Se precisar do PDF completo sem cortar, aumente `memory_limit` no PHP **e** ajuste a constante, não faça só uma das duas coisas.
+
+Ainda não implementado da Fase 7.5: tempo médio de tramitação e processos com prazo vencido (dependem da Fase 7.3 — Prazos e Alertas, ainda não iniciada).
+
+### 🔲 Próximas fases do módulo (ver roadmap dedicado)
+
+- **Fase 7.3** — Prazos e alertas (regras de prazo por tipo de processo, dias sem movimentação, painel de vencidos)
+- **Fase 7.4** — Sub-módulos específicos (Renovação de Alvará por mês, SISOBRA, Desarquivamento, Água e Luz com múltiplos relógios)
+- **Fase 7.6** (opcional) — Consulta pública por número de processo, sem login
+
+> Antes de fechar o vocabulário de fases/setores como definitivo, o roadmap recomenda uma chamada com as técnicas do Departamento de Obras Particulares — ainda não realizada.
+
+---
+
 ## 🗄️ Banco de Dados
 
 ```
@@ -153,6 +228,15 @@ contratos
 execucao_obras
 execucao_responsaveis      ← pivot medição ↔ usuário (com campo papel)
 documentos                 ← polimórfico: obras, contratos, execucao_obras
+
+-- Módulo Processos Administrativos (Fase 7.x) --
+tipos_processo
+fases_processo             ← domínio editável, não enum — vocabulário ainda não definitivo
+responsaveis_tecnicos
+processos                  ← fase_atual_id + motivo_pendencia = núcleo do módulo
+tramites                   ← importacao_ref = chave de idempotência da importação Excel
+desarquivamentos           ← processo_id nullable (ver Fase 7.2 no README)
+renovacoes_alvara          ← processo_id nullable, agrupado por mes_referencia
 ```
 
 ---
@@ -220,7 +304,7 @@ Acesse: [http://localhost:8000](http://localhost:8000)
 
 | E-mail                        | Senha           | Perfil    |
 |-------------------------------|-----------------|-----------|
-| admin@riogrande.sp.gov.br     | Admin@2024!     | admin     |
+| jmarciosilva@gmail.com        | 12345678        | admin     |
 | tecnico@riogrande.sp.gov.br   | Tecnico@2024!   | tecnico   |
 | operador@riogrande.sp.gov.br  | Operador@2024!  | operador  |
 
@@ -232,30 +316,50 @@ Acesse: [http://localhost:8000](http://localhost:8000)
 
 ```
 app/
+├── Console/Commands/
+│   └── ImportarProcessosHistorico.php  ← Fase 7.2
 ├── Exports/
 │   ├── RelatorioExport.php
+│   ├── RelatorioProcessoExport.php     ← Fase 7.5
 │   └── Sheets/
 │       ├── ResumoSheet.php
 │       ├── ObrasSheet.php
 │       ├── ExecucaoFinanceiraSheet.php
 │       ├── ContratosVencendoSheet.php
-│       └── PorEmpresaSheet.php
+│       ├── PorEmpresaSheet.php
+│       └── Processos/                  ← Fase 7.5 (namespace próprio, não colide com as sheets acima)
+│           ├── ResumoSheet.php
+│           ├── ProcessosSheet.php
+│           ├── PorFaseSheet.php
+│           ├── PorTipoSheet.php
+│           └── PendenciasSheet.php
+├── Jobs/
+│   └── ImportarProcessosHistoricoJob.php  ← Fase 7.2 (ShouldQueue)
+├── Services/Importacao/                    ← Fase 7.2
+│   ├── NumeroProcessoNormalizer.php
+│   ├── TramiteCellParser.php
+│   ├── TipoProcessoMatcher.php
+│   └── ResponsavelTecnicoMatcher.php
 ├── Http/
 │   ├── Controllers/
-│   │   ├── DashboardController.php
+│   │   ├── DashboardController.php     ← + seção Processos (Fase 7.5)
 │   │   ├── ObraController.php          ← + método grafico() (Fase 4)
 │   │   ├── ConvenioController.php
 │   │   ├── ContratoController.php
 │   │   ├── ExecucaoObraController.php
 │   │   ├── DocumentoController.php
 │   │   ├── RelatorioController.php     ← Fase 3
+│   │   ├── ProcessoController.php      ← Fase 7.1
+│   │   ├── TramiteController.php       ← Fase 7.1
+│   │   ├── RelatorioProcessoController.php  ← Fase 7.5
 │   │   └── Admin/
 │   │       ├── UsuarioController.php
 │   │       ├── EmpresaController.php
 │   │       ├── StatusObraController.php
 │   │       ├── CategoriaConvenioController.php
 │   │       ├── OrgaoFinanciadorController.php
-│   │       └── DemandaPropostaController.php
+│   │       ├── DemandaPropostaController.php
+│   │       └── ResponsavelTecnicoController.php  ← Fase 7.1
 │   └── Middleware/
 │       └── CheckPerfil.php
 ├── Models/
@@ -269,29 +373,54 @@ app/
 │   ├── CategoriaConvenio.php
 │   ├── OrgaoFinanciador.php
 │   ├── DemandaProposta.php
-│   └── Empresa.php
+│   ├── Empresa.php
+│   ├── Processo.php           ← Fase 7.1 — accessor endereco_completo
+│   ├── Tramite.php            ← Fase 7.1
+│   ├── TipoProcesso.php       ← Fase 7.1
+│   ├── FaseProcesso.php       ← Fase 7.1 — domínio editável, não enum
+│   ├── ResponsavelTecnico.php ← Fase 7.1 — $table explícito (plural irregular)
+│   ├── Desarquivamento.php    ← Fase 7.2
+│   └── RenovacaoAlvara.php    ← Fase 7.2
 database/
 ├── migrations/
 └── seeders/
+    ├── TipoProcessoSeeder.php   ← Fase 7.1
+    └── FaseProcessoSeeder.php   ← Fase 7.1 — vocabulário ainda não definitivo
+lang/
+├── pt_BR/
+│   ├── validation.php  ← mensagens de validação em pt-BR (todo o sistema)
+│   └── pagination.php
+└── pt_BR.json           ← "Showing/to/of/results" da paginação
 resources/views/
 ├── layouts/app.blade.php
-├── dashboard.blade.php
+├── dashboard.blade.php        ← + seção Processos (Fase 7.5)
 ├── obras/
 │   ├── index.blade.php
 │   ├── create.blade.php
 │   ├── edit.blade.php
 │   └── show.blade.php         ← Fase 4: gráficos Chart.js na aba Execuções
 ├── relatorios/                ← Fase 3
-│   ├── index.blade.php
+│   ├── index.blade.php        ← + seletor de módulo (Obras / Processos)
 │   ├── preview.blade.php
-│   └── pdf.blade.php
+│   ├── pdf.blade.php
+│   └── processos/              ← Fase 7.5
+│       ├── index.blade.php
+│       ├── preview.blade.php
+│       └── pdf.blade.php
+├── processos/                   ← Fase 7.1
+│   ├── index.blade.php
+│   ├── create.blade.php
+│   ├── edit.blade.php
+│   ├── show.blade.php          ← linha do tempo de trâmites
+│   └── _form.blade.php
 ├── convenios/
 │   └── vincular-obras.blade.php
 ├── contratos/
 ├── execucoes/
 ├── admin/
 │   ├── usuarios/
-│   └── empresas/
+│   ├── empresas/
+│   └── responsaveis-tecnicos/   ← Fase 7.1
 └── components/
 routes/
 └── web.php
@@ -339,12 +468,26 @@ GET        /relatorios/preview                           relatorios.preview
 GET        /relatorios/pdf                               relatorios.pdf
 GET        /relatorios/excel                             relatorios.excel
 
-/admin/usuarios          (CRUD + toggle ativo)
-/admin/empresas          (CRUD)
-/admin/status-obras      (CRUD)
+GET|POST   /processos                                     processos.index / store  ← Fase 7.1
+GET        /processos/criar                                processos.create
+GET        /processos/visualizar/{processo}                processos.show
+GET|PUT    /processos/{processo}/editar                    processos.edit / update
+DELETE     /processos/{processo}/excluir                   processos.destroy
+POST       /processos/{processo}/tramites/salvar           processos.tramites.store
+DELETE     /processos/{processo}/tramites/{tramite}/excluir processos.tramites.destroy
+
+GET        /relatorios/processos                           relatorios.processos.index   ← Fase 7.5
+GET        /relatorios/processos/preview                   relatorios.processos.preview
+GET        /relatorios/processos/pdf                       relatorios.processos.pdf
+GET        /relatorios/processos/excel                     relatorios.processos.excel
+
+/admin/usuarios              (CRUD + toggle ativo)
+/admin/empresas              (CRUD)
+/admin/status-obras          (CRUD)
 /admin/categorias-convenio
 /admin/orgaos-financiadores
 /admin/demandas-propostas
+/admin/responsaveis-tecnicos (CRUD — Fase 7.1; store também aceita perfil "tecnico", não só "admin")
 ```
 
 ---
@@ -362,6 +505,21 @@ PDF com gráficos SVG server-side e Excel com 5 abas. Filtros por status, empres
 
 ### ✅ Fase 4 — Gráfico de evolução por obra *(concluída)*
 Três gráficos Chart.js na aba Execuções: linha de evolução do percentual, barras de execução financeira por contrato e misto de valor por medição + acumulado. Projeção automática de conclusão com nível de confiança.
+
+---
+
+> ℹ️ **Numeração de fases:** a partir daqui, **Fase 5/6** continuam a numeração do módulo de **Obras**. O módulo de **Processos Administrativos** usa sua própria numeração, **Fase 7.x** (documentada em detalhe na seção [🗂️ Módulo Processos Administrativos](#-módulo-processos-administrativos-licenciamento-e-alvarás) acima e no roadmap dedicado). São duas frentes paralelas, não sequenciais entre si.
+
+### ✅ Fase 7.1 — Fundação, Fases do Processo e CRUD Essencial *(concluída)*
+### ✅ Fase 7.2 — Importação do Histórico via Excel *(concluída)*
+### ✅ Fase 7.5 (parcial) — Dashboard e Relatórios *(concluída)*
+Ver seção dedicada acima para detalhes. Pendente da Fase 7.5: métricas que dependem da Fase 7.3 (tempo médio de tramitação, prazo vencido).
+
+### 🔲 Fase 7.3 — Prazos e alertas *(não iniciada)*
+### 🔲 Fase 7.4 — Sub-módulos: Renovação de Alvará, SISOBRA, Desarquivamento, Água e Luz *(não iniciada)*
+### 🔲 Fase 7.6 — Consulta pública por número de processo *(opcional, não iniciada)*
+
+> Detalhamento completo, diagnóstico do problema real e riscos conhecidos em [`roadmap-modulo-processos-administrativos.md`](./roadmap-modulo-processos-administrativos.md).
 
 ---
 

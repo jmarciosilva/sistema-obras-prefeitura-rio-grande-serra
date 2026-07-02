@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\OrgaoFinanciadorController;
 use App\Http\Controllers\Admin\DemandaPropostaController;
 use App\Http\Controllers\Admin\ResponsavelTecnicoController;
 use App\Http\Controllers\RelatorioController;
+use App\Http\Controllers\RelatorioProcessoController;
 
 // ───────────────────────────────────────────────────────────────
 // 🔐 ROTAS DE AUTENTICAÇÃO (Laravel Breeze)
@@ -39,6 +40,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/preview', [RelatorioController::class, 'preview'])->name('preview');
         Route::get('/pdf',     [RelatorioController::class, 'exportarPdf'])->name('pdf');
         Route::get('/excel',   [RelatorioController::class, 'exportarExcel'])->name('excel');
+
+        // 🗂️ Relatórios de Processos Administrativos (Fase 7.5)
+        Route::prefix('processos')->name('processos.')->group(function () {
+            Route::get('/',        [RelatorioProcessoController::class, 'index'])->name('index');
+            Route::get('/preview', [RelatorioProcessoController::class, 'preview'])->name('preview');
+            Route::get('/pdf',     [RelatorioProcessoController::class, 'exportarPdf'])->name('pdf');
+            Route::get('/excel',   [RelatorioProcessoController::class, 'exportarExcel'])->name('excel');
+        });
     });
 
     // ───────────────────────────────────────────────────────────
