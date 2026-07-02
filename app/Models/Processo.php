@@ -34,10 +34,15 @@ class Processo extends Model
         'caixa_atual',
         'motivo_pendencia',
         'situacao',
+        'sisobra',
+        'sisobra_data_cadastro',
+        'origem_importacao',
     ];
 
     protected $casts = [
-        'data_entrada' => 'date',
+        'data_entrada'          => 'date',
+        'sisobra'                => 'boolean',
+        'sisobra_data_cadastro' => 'date',
     ];
 
     const SITUACAO_ABERTO    = 'aberto';
@@ -68,6 +73,16 @@ class Processo extends Model
     public function tramites(): HasMany
     {
         return $this->hasMany(Tramite::class)->orderByDesc('data')->orderByDesc('id');
+    }
+
+    public function desarquivamentos(): HasMany
+    {
+        return $this->hasMany(Desarquivamento::class);
+    }
+
+    public function renovacoesAlvara(): HasMany
+    {
+        return $this->hasMany(RenovacaoAlvara::class);
     }
 
     // ── Accessors ────────────────────────────────────────────────

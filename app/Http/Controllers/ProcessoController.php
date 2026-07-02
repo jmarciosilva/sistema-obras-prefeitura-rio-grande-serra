@@ -6,6 +6,7 @@ use App\Models\FaseProcesso;
 use App\Models\Processo;
 use App\Models\ResponsavelTecnico;
 use App\Models\TipoProcesso;
+use App\Services\Importacao\NumeroProcessoNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -178,9 +179,8 @@ class ProcessoController extends Controller
         ]);
     }
 
-    /** Remove tudo que não for letra/número e coloca em caixa alta, para busca/deduplicação futura. */
     private function normalizarNumero(string $numero): string
     {
-        return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $numero));
+        return NumeroProcessoNormalizer::normalizar($numero);
     }
 }

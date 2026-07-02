@@ -18,12 +18,18 @@ use Illuminate\Database\Seeder;
  * Como fases_processo é uma tabela de domínio (não um enum de banco), renomear,
  * reordenar ou adicionar fases depois dessa validação é uma operação simples de dado,
  * sem necessidade de nova migration.
+ *
+ * "A Classificar" (ordem 0) não faz parte do fluxo real — é usada pelo importador de
+ * Excel da Fase 7.2 para trâmites históricos que não têm fase estruturada na planilha
+ * (só existe texto livre). Fica em destaque no início da lista para facilitar a
+ * curadoria manual progressiva desses registros.
  */
 class FaseProcessoSeeder extends Seeder
 {
     public function run(): void
     {
         $fases = [
+            ['nome' => 'A Classificar',                                'cor' => '#cbd5e1', 'ordem' => 0],
             ['nome' => 'Protocolado',                                  'cor' => '#64748b', 'ordem' => 1],
             ['nome' => 'Recebido em Obras',                            'cor' => '#94a3b8', 'ordem' => 2],
             ['nome' => 'Em Primeira Análise',                          'cor' => '#0d6efd', 'ordem' => 3],

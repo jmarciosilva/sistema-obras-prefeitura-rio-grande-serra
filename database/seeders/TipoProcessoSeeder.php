@@ -11,6 +11,10 @@ use Illuminate\Database\Seeder;
  *
  * Não inclui SISOBRA, Água e Luz, Renovação de Alvará ou Desarquivamento — esses
  * fluxos aparecem só na planilha (uso real) e entram como sub-módulos na Fase 7.4.
+ *
+ * O 13º item ("Outros / A Classificar") não vem do Word — é o fallback usado pelo
+ * importador da Fase 7.2 quando o texto livre da coluna ASSUNTO da planilha não bate
+ * com nenhum dos 12 serviços formais. Curadoria manual reclassifica depois.
  */
 class TipoProcessoSeeder extends Seeder
 {
@@ -29,6 +33,7 @@ class TipoProcessoSeeder extends Seeder
             ['nome' => 'Alvará de Desdobro/Unificação/Desmembramento', 'sigla' => 'ADUD', 'ordem' => 10],
             ['nome' => 'Muro de Contenção',                          'sigla' => 'MC',  'ordem' => 11],
             ['nome' => 'Manutenção de Iluminação Pública',           'sigla' => 'MIP', 'ordem' => 12],
+            ['nome' => 'Outros / A Classificar',                     'sigla' => 'OAC', 'ordem' => 99],
         ];
 
         foreach ($tipos as $t) {

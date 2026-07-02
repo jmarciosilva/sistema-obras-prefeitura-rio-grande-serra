@@ -24,6 +24,7 @@ class Tramite extends Model
         'fase_id',
         'setor_destino',
         'tipo_evento',
+        'importacao_ref',
     ];
 
     protected $casts = [
