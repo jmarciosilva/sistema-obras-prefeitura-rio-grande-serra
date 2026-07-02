@@ -184,7 +184,13 @@
       <li>✔ Acompanhar se algum contrato tá perto de vencer</li>
       <li>✔ Guardar e acessar documentos de qualquer computador</li>
       <li>✔ Gerar relatórios em PDF ou Excel com poucos cliques</li>
+      <li>✔ Acompanhar processos administrativos (alvarás, certidões) e saber em qual fase cada um está</li>
     </ul>
+  </div>
+
+  <div class="p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+    <p class="font-semibold text-indigo-800 mb-1">🗂️ Duas frentes num sistema só</p>
+    <p class="text-indigo-700 text-sm">Além das <strong>Obras</strong>, o sistema também tem o módulo de <strong>Processos Administrativos</strong> (licenciamento — alvarás, certidões, ligações de água/energia). São coisas diferentes: obra é investimento público, processo é licenciamento urbano. Cada um tem seu próprio conjunto de módulos neste manual.</p>
   </div>
 
   <p class="font-semibold text-slate-800">Quem usa o sistema e o que cada um pode fazer:</p>
@@ -249,6 +255,7 @@
         <div class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">🏗️ Obras</div>
         <div class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">🤝 Convênios</div>
         <div class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">📋 Contratos</div>
+        <div class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">🗂️ Processos</div>
         <div class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">📊 Relatórios</div>
         <div class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">📘 Manual</div>
         <div class="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-700 rounded-lg cursor-pointer">⚙️ Admin</div>
@@ -922,6 +929,277 @@
       <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">🚦 <strong>Por Status</strong> — obras agrupadas</div>
       <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">🏢 <strong>Por Empresa</strong> — ranking</div>
       <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">🏛️ <strong>Por Órgão</strong> — por financiador</div>
+    </div>
+  </div>
+</div>
+`,
+                        },
+
+                        // ═══════════════════════════════════════════════════════
+                        // MÓDULO 10-A — PROCESSOS ADMINISTRATIVOS: VISÃO GERAL
+                        // ═══════════════════════════════════════════════════════
+                        {
+                            titulo: 'Processos Administrativos — o que é isso?',
+                            icone: '🗂️',
+                            cor: 'indigo',
+                            perfis: ['todos'],
+                            conteudo: `
+<div class="space-y-5 text-slate-700 text-sm leading-relaxed">
+
+  <p>Além das obras públicas, o sistema também acompanha os <strong>Processos Administrativos</strong> da Secretaria — alvarás, certidões, ligações de água e energia. É uma frente separada das obras, com sua própria tela, mas usa o mesmo login e o mesmo menu lateral.</p>
+
+  <div class="p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+    <p class="font-semibold text-indigo-800 mb-2">Qual é o objetivo desse módulo?</p>
+    <p class="text-indigo-700 text-sm">Hoje o controle desses processos é feito numa planilha, em texto livre. O pedido principal do Secretário é simples: <strong>saber em qual fase está cada processo — e, se estiver parado, por qual motivo.</strong> É exatamente isso que essa tela resolve.</p>
+  </div>
+
+  <p class="font-semibold text-slate-800">Os 5 conceitos principais:</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+      <p class="text-lg mb-1">🗂️</p>
+      <p class="font-semibold text-slate-800">Processo</p>
+      <p class="text-xs text-slate-500 mt-1">O registro principal: número, requerente, endereço, tipo de serviço, responsável técnico e situação (aberto/arquivado).</p>
+    </div>
+    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+      <p class="text-lg mb-1">🔄</p>
+      <p class="font-semibold text-slate-800">Trâmite</p>
+      <p class="text-xs text-slate-500 mt-1">Cada movimentação do processo, registrada como numa linha do tempo. Toda vez que algo acontece, você lança um novo trâmite.</p>
+    </div>
+    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+      <p class="text-lg mb-1">📍</p>
+      <p class="font-semibold text-slate-800">Fase</p>
+      <p class="text-xs text-slate-500 mt-1">Em qual etapa da tramitação o processo está agora (Protocolado, Em Análise, Notificado, Arquivado...). Atualizada automaticamente a cada trâmite.</p>
+    </div>
+    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+      <p class="text-lg mb-1">🏷️</p>
+      <p class="font-semibold text-slate-800">Tipo de Processo</p>
+      <p class="text-xs text-slate-500 mt-1">O serviço solicitado: alvará de construção, certidão de uso do solo, ligação de água/energia, entre outros.</p>
+    </div>
+    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+      <p class="text-lg mb-1">👷</p>
+      <p class="font-semibold text-slate-800">Responsável Técnico</p>
+      <p class="text-xs text-slate-500 mt-1">O engenheiro ou arquiteto (CREA/CAU) vinculado ao processo.</p>
+    </div>
+    <div class="p-4 bg-amber-50 rounded-xl border border-amber-200">
+      <p class="text-lg mb-1">📥</p>
+      <p class="font-semibold text-amber-800">"A Classificar"</p>
+      <p class="text-xs text-amber-700 mt-1">Processos importados do histórico antigo (planilha) começam nessa fase e tipo genéricos, até alguém revisar e classificar corretamente.</p>
+    </div>
+  </div>
+</div>
+`,
+                        },
+
+                        // ═══════════════════════════════════════════════════════
+                        // MÓDULO 10-B — CONSULTANDO PROCESSOS
+                        // ═══════════════════════════════════════════════════════
+                        {
+                            titulo: 'Consultando processos',
+                            icone: '🔍',
+                            cor: 'green',
+                            perfis: ['todos'],
+                            conteudo: `
+<div class="space-y-5 text-slate-700 text-sm leading-relaxed">
+
+  <p>Clica em <strong>🗂️ Processos</strong> no menu lateral e você vê a lista completa, com o mesmo estilo de busca e filtros da tela de Obras.</p>
+
+  {{-- Simulação da lista --}}
+  <div class="rounded-xl border border-slate-200 overflow-hidden shadow-sm text-xs">
+    <div class="bg-slate-50 border-b px-4 py-2.5 flex items-center justify-between">
+      <span class="font-semibold text-slate-700">🗂️ Processos</span>
+      <span class="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs">➕ Novo Processo</span>
+    </div>
+    <div class="p-3 bg-white">
+      <div class="grid grid-cols-4 gap-1.5 mb-3 text-xs">
+        <div class="h-7 bg-slate-50 rounded border border-slate-200 flex items-center px-2 text-slate-400">Tipo</div>
+        <div class="h-7 bg-slate-50 rounded border border-slate-200 flex items-center px-2 text-slate-400">Fase</div>
+        <div class="h-7 bg-slate-50 rounded border border-slate-200 flex items-center px-2 text-slate-400">Responsável</div>
+        <div class="h-7 bg-slate-50 rounded border border-slate-200 flex items-center px-2 text-slate-400">Situação</div>
+      </div>
+      <table class="w-full">
+        <tbody class="divide-y divide-slate-100">
+          <tr>
+            <td class="p-2">
+              <div class="font-medium text-slate-800">1831/2019-5</div>
+              <div class="text-slate-400 text-xs">Eliezer Aparecido da Silva</div>
+            </td>
+            <td class="p-2 text-center">
+              <span class="px-2 py-0.5 bg-amber-500 text-white rounded-full text-xs">Notificado</span>
+              <div class="text-red-500 text-xs mt-0.5">⚠️ aguardando devolutiva</div>
+            </td>
+            <td class="p-2 text-right">
+              <span class="px-2 py-1 border border-indigo-200 text-indigo-700 bg-indigo-50 rounded text-xs">👁 Ver</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="space-y-3">
+    <div class="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+      <span class="text-xl shrink-0">🔍</span>
+      <div>
+        <p class="font-semibold">Filtros disponíveis</p>
+        <p class="text-slate-500 text-xs mt-0.5">Número/requerente, endereço, tipo de processo, fase atual, responsável técnico e situação (aberto/arquivado). Combine quantos quiser.</p>
+      </div>
+    </div>
+    <div class="flex gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-200">
+      <span class="text-xl shrink-0">📍</span>
+      <div>
+        <p class="font-semibold text-indigo-800">A cor da fase importa</p>
+        <p class="text-indigo-700 text-xs mt-0.5">Cada fase tem uma cor própria no badge. Quando o processo tem um <strong>motivo de pendência</strong> registrado, aparece um aviso ⚠️ vermelho embaixo do badge — é isso que indica "está parado, e por quê".</p>
+      </div>
+    </div>
+    <div class="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+      <span class="text-xl shrink-0">👁</span>
+      <div>
+        <p class="font-semibold">Abrindo um processo</p>
+        <p class="text-slate-500 text-xs mt-0.5">Clica em <strong>👁 Ver</strong> pra abrir a tela de detalhe, com todos os dados e a <strong>linha do tempo completa de trâmites</strong>, do mais recente pro mais antigo.</p>
+      </div>
+    </div>
+  </div>
+</div>
+`,
+                        },
+
+                        // ═══════════════════════════════════════════════════════
+                        // MÓDULO 10-C — CADASTRANDO PROCESSOS E TRÂMITES
+                        // ═══════════════════════════════════════════════════════
+                        {
+                            titulo: 'Cadastrando processos e trâmites',
+                            icone: '✏️',
+                            cor: 'amber',
+                            perfis: ['admin', 'tecnico'],
+                            conteudo: `
+<div class="space-y-5 text-slate-700 text-sm leading-relaxed">
+
+  <p>Pra cadastrar um processo novo, clica em <strong>➕ Novo Processo</strong> na tela de listagem. É um formulário só, sem passos — mais rápido que o de obras.</p>
+
+  <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+    <p class="font-semibold text-amber-800 mb-2">📍 Endereço com CEP automático</p>
+    <p class="text-amber-700 text-sm">Digite o CEP e o sistema preenche sozinho rua, bairro, cidade e UF. Número e complemento (apto, bloco, condomínio) você preenche na mão — isso a API de CEP não sabe.</p>
+  </div>
+
+  <div class="space-y-2">
+    <div class="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 items-start">
+      <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold shrink-0">1</span>
+      <div>
+        <p class="font-semibold">Dados básicos</p>
+        <p class="text-slate-500 text-xs mt-0.5">Número do processo, requerente e endereço (com CEP).</p>
+      </div>
+    </div>
+    <div class="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 items-start">
+      <span class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold shrink-0">2</span>
+      <div>
+        <p class="font-semibold">Tipo e responsável técnico</p>
+        <p class="text-slate-500 text-xs mt-0.5">Escolhe o tipo de serviço. Se o responsável técnico ainda não tiver cadastro, clica em <strong>"➕ Novo Responsável"</strong> — abre um formulário rápido sem sair da tela, igual ao de empresas em Contratos.</p>
+      </div>
+    </div>
+    <div class="flex gap-3 p-3 bg-green-50 rounded-xl border border-green-200 items-start">
+      <span class="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center text-sm font-bold shrink-0">3</span>
+      <div>
+        <p class="font-semibold text-green-800">Fase inicial e situação</p>
+        <p class="text-green-700 text-xs mt-0.5">Pra processo novo, normalmente a fase é <strong>"Protocolado"</strong> e a situação é <strong>"Aberto"</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+    <p class="font-semibold text-indigo-800 mb-2">🔄 Depois de criado: registrando trâmites</p>
+    <p class="text-indigo-700 text-sm mb-3">Na tela de detalhe do processo, use o formulário <strong>"Registrar Trâmite"</strong> toda vez que algo acontecer — é exatamente como anotar na planilha, só que agora estruturado.</p>
+    <div class="space-y-1.5 text-indigo-700 text-xs">
+      <div class="flex gap-2"><span class="font-bold shrink-0">Fase*</span><span>Obrigatório. Escolha a fase atual — isso <strong>atualiza automaticamente</strong> a fase do processo na listagem e no dashboard.</span></div>
+      <div class="flex gap-2"><span class="font-bold shrink-0">Descrição*</span><span>Obrigatório. Texto livre, igual ao hábito da planilha — ex.: "Notificado via e-mail em 21/10, aguardar CX 12 novembro".</span></div>
+      <div class="flex gap-2"><span class="font-bold shrink-0">Motivo da pendência</span><span>Opcional. Preencha quando o trâmite deixar o processo parado — esse texto aparece como alerta na listagem e no painel principal.</span></div>
+    </div>
+  </div>
+
+  <div class="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+    <span class="text-xl shrink-0">💡</span>
+    <div>
+      <p class="font-semibold">Editar processo × registrar trâmite</p>
+      <p class="text-slate-500 text-xs mt-0.5">Use <strong>✏️ Editar</strong> só pra corrigir dados cadastrais (número, requerente, endereço). Pra mudar de fase no dia a dia, sempre prefira <strong>registrar um novo trâmite</strong> — assim fica um histórico completo.</p>
+    </div>
+  </div>
+</div>
+`,
+                        },
+
+                        // ═══════════════════════════════════════════════════════
+                        // MÓDULO 10-D — DASHBOARD E RELATÓRIOS DE PROCESSOS
+                        // ═══════════════════════════════════════════════════════
+                        {
+                            titulo: 'Dashboard e relatórios de Processos',
+                            icone: '📊',
+                            cor: 'purple',
+                            perfis: ['admin', 'tecnico', 'secretario'],
+                            conteudo: `
+<div class="space-y-5 text-slate-700 text-sm leading-relaxed">
+
+  <p>O Painel Principal (aquele mesmo dashboard das obras) também mostra um resumo dos processos administrativos, mais abaixo na mesma página.</p>
+
+  {{-- Simulação do painel de processos --}}
+  <div class="rounded-xl border border-slate-200 overflow-hidden shadow-sm text-xs">
+    <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+      <span class="font-semibold text-slate-700">🗂️ Processos Administrativos</span>
+    </div>
+    <div class="p-4 bg-white space-y-3">
+      <div class="grid grid-cols-4 gap-2">
+        <div class="p-2 bg-blue-50 rounded-lg border border-blue-100 text-center">
+          <div class="text-lg font-bold text-blue-700">2.275</div>
+          <div class="text-blue-500 text-xs">Total</div>
+        </div>
+        <div class="p-2 bg-green-50 rounded-lg border border-green-100 text-center">
+          <div class="text-lg font-bold text-green-700">2.274</div>
+          <div class="text-green-500 text-xs">Abertos</div>
+        </div>
+        <div class="p-2 bg-slate-50 rounded-lg border border-slate-200 text-center">
+          <div class="text-lg font-bold text-slate-600">1</div>
+          <div class="text-slate-500 text-xs">Arquivados</div>
+        </div>
+        <div class="p-2 bg-amber-50 rounded-lg border border-amber-100 text-center">
+          <div class="text-lg font-bold text-amber-700">704</div>
+          <div class="text-amber-500 text-xs">A Classificar</div>
+        </div>
+      </div>
+      <div class="text-xs text-slate-500 text-center pt-1">+ gráfico de pizza por fase e barras por tipo de serviço</div>
+    </div>
+  </div>
+
+  <div class="space-y-3">
+    <div class="flex gap-3 p-3 bg-purple-50 rounded-xl border border-purple-200">
+      <span class="text-xl shrink-0">📍</span>
+      <div>
+        <p class="font-semibold text-purple-800">O gráfico mais importante</p>
+        <p class="text-purple-700 text-xs mt-0.5">A pizza "Processos por Fase" é a resposta visual direta ao pedido do Secretário: mostra de cara quantos processos estão em cada etapa. Clique numa fatia da legenda pra ver os processos daquela fase.</p>
+      </div>
+    </div>
+    <div class="flex gap-3 p-3 bg-red-50 rounded-xl border border-red-200">
+      <span class="text-xl shrink-0">⚠️</span>
+      <div>
+        <p class="font-semibold text-red-800">Aba "Processos pendentes"</p>
+        <p class="text-red-700 text-xs mt-0.5">Fica junto com os outros alertas do painel (contratos e convênios vencendo) — lista os processos abertos que têm motivo de pendência registrado.</p>
+      </div>
+    </div>
+  </div>
+
+  <p>Pra relatórios completos, vai em <strong>📊 Relatórios</strong> no menu e clica no seletor <strong>🗂️ Processos Administrativos</strong> no topo da tela pra trocar do módulo de Obras pro de Processos.</p>
+
+  <div class="grid grid-cols-2 gap-2 text-xs">
+    <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">📋 <strong>Geral</strong> — todos os processos</div>
+    <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">📍 <strong>Por Fase</strong> — quantidade por etapa</div>
+    <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">🏷️ <strong>Por Tipo</strong> — quantidade por serviço</div>
+    <div class="p-2 bg-slate-50 rounded-lg border border-slate-200">⚠️ <strong>Pendências</strong> — processos parados</div>
+    <div class="p-2 bg-slate-50 rounded-lg border border-slate-200 col-span-2">👷 <strong>Por Responsável</strong> — ranking de responsáveis técnicos</div>
+  </div>
+
+  <div class="flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+    <span class="text-xl shrink-0">💡</span>
+    <div>
+      <p class="font-semibold">Mesmo jeito de exportar</p>
+      <p class="text-slate-500 text-xs mt-0.5">Pré-visualize, depois exporte em <strong>📄 PDF</strong> ou <strong>📊 Excel</strong> — o mesmo fluxo dos relatórios de Obras, com o mesmo visual institucional.</p>
     </div>
   </div>
 </div>
