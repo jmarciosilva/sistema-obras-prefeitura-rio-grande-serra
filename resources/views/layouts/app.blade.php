@@ -70,6 +70,13 @@
                     📋 <span x-show="sidebarOpen">Contratos</span>
                 </a>
 
+                {{-- Processos Administrativos --}}
+                <a href="{{ route('processos.index') }}"
+                    class="flex items-center gap-3 px-3 py-2 rounded-md
+                      {{ request()->routeIs('processos.*') ? 'bg-blue-600' : 'hover:bg-slate-700' }}">
+                    🗂️ <span x-show="sidebarOpen">Processos</span>
+                </a>
+
                 @if (in_array(auth()->user()->perfil, ['admin', 'secretario', 'tecnico']))
                     <a href="{{ route('relatorios.index') }}"
                         class="flex items-center gap-3 px-3 py-2 rounded-md
@@ -138,6 +145,12 @@
                                     class="flex items-center gap-2 px-3 py-2 rounded-md text-sm
                               {{ request()->routeIs('admin.demandas-propostas.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white' }}">
                                     📝 Demandas
+                                </a>
+
+                                <a href="{{ route('admin.responsaveis-tecnicos.index') }}"
+                                    class="flex items-center gap-2 px-3 py-2 rounded-md text-sm
+                              {{ request()->routeIs('admin.responsaveis-tecnicos.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white' }}">
+                                    👷 Responsáveis Técnicos
                                 </a>
 
                             </div>

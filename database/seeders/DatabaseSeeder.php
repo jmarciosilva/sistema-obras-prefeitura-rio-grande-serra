@@ -13,6 +13,8 @@ class DatabaseSeeder extends Seeder
             StatusObraSeeder::class,
             CategoriaConvenioSeeder::class,
             OrgaoFinanciadorSeeder::class,
+            TipoProcessoSeeder::class,
+            FaseProcessoSeeder::class,
 
             // 2. Usuários
             UserSeeder::class,

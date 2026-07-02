@@ -8,6 +8,8 @@ use App\Http\Controllers\ContratoController;
 use App\Http\Controllers\ExecucaoObraController;
 use App\Http\Controllers\DocumentoController;
 use App\Http\Controllers\PerfilController;
+use App\Http\Controllers\ProcessoController;
+use App\Http\Controllers\TramiteController;
 
 // Admin
 use App\Http\Controllers\Admin\UsuarioController;
@@ -16,6 +18,7 @@ use App\Http\Controllers\Admin\StatusObraController;
 use App\Http\Controllers\Admin\CategoriaConvenioController;
 use App\Http\Controllers\Admin\OrgaoFinanciadorController;
 use App\Http\Controllers\Admin\DemandaPropostaController;
+use App\Http\Controllers\Admin\ResponsavelTecnicoController;
 use App\Http\Controllers\RelatorioController;
 
 // ───────────────────────────────────────────────────────────────
@@ -141,6 +144,49 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ───────────────────────────────────────────────────────────
+    // 🗂️ PROCESSOS ADMINISTRATIVOS (LICENCIAMENTO E ALVARÁS)
+    // ───────────────────────────────────────────────────────────
+    Route::prefix('processos')->name('processos.')->group(function () {
+
+        // 📄 LISTAGEM
+        Route::get('/', [ProcessoController::class, 'index'])->name('index');
+
+        // ➕ CRIAÇÃO
+        Route::middleware('perfil:admin,tecnico')->group(function () {
+            Route::get('/criar', [ProcessoController::class, 'create'])->name('create');
+            Route::post('/salvar', [ProcessoController::class, 'store'])->name('store');
+        });
+
+        // ✏️ EDIÇÃO
+        Route::middleware('perfil:admin,tecnico')->group(function () {
+            Route::get('/{processo}/editar', [ProcessoController::class, 'edit'])->name('edit');
+            Route::put('/{processo}/atualizar', [ProcessoController::class, 'update'])->name('update');
+        });
+
+        // 👁️ VISUALIZAÇÃO (SEMPRE POR ÚLTIMO)
+        Route::get('/visualizar/{processo}', [ProcessoController::class, 'show'])->name('show');
+
+        // 🗑️ EXCLUSÃO
+        Route::middleware('perfil:admin')->group(function () {
+            Route::delete('/{processo}/excluir', [ProcessoController::class, 'destroy'])->name('destroy');
+        });
+
+        // ───────────────
+        // 🔄 TRÂMITES (LINHA DO TEMPO)
+        // ───────────────
+        Route::prefix('{processo}/tramites')->name('tramites.')->group(function () {
+
+            Route::middleware('perfil:admin,tecnico')->group(function () {
+                Route::post('/salvar', [TramiteController::class, 'store'])->name('store');
+            });
+
+            Route::middleware('perfil:admin')->group(function () {
+                Route::delete('/{tramite}/excluir', [TramiteController::class, 'destroy'])->name('destroy');
+            });
+        });
+    });
+
+    // ───────────────────────────────────────────────────────────
     // 📄 CONVÊNIOS
     // ───────────────────────────────────────────────────────────
     Route::prefix('convenios')->name('convenios.')->group(function () {
@@ -246,5 +292,20 @@ Route::middleware(['auth'])->group(function () {
         Route::get('demandas-propostas/{demanda}/editar', [DemandaPropostaController::class, 'edit'])->name('demandas-propostas.edit');
         Route::put('demandas-propostas/{demanda}/atualizar', [DemandaPropostaController::class, 'update'])->name('demandas-propostas.update');
         Route::delete('demandas-propostas/{demanda}/excluir', [DemandaPropostaController::class, 'destroy'])->name('demandas-propostas.destroy');
+
+        // 👷 Responsáveis Técnicos (Processos Administrativos)
+        // 'store' fica fora deste grupo (perfil:admin) — ver logo abaixo — porque
+        // técnicos também precisam poder cadastrar um responsável ao criar um processo.
+        Route::get('responsaveis-tecnicos', [ResponsavelTecnicoController::class, 'index'])->name('responsaveis-tecnicos.index');
+        Route::get('responsaveis-tecnicos/criar', [ResponsavelTecnicoController::class, 'create'])->name('responsaveis-tecnicos.create');
+        Route::get('responsaveis-tecnicos/{responsavel}/editar', [ResponsavelTecnicoController::class, 'edit'])->name('responsaveis-tecnicos.edit');
+        Route::put('responsaveis-tecnicos/{responsavel}/atualizar', [ResponsavelTecnicoController::class, 'update'])->name('responsaveis-tecnicos.update');
+        Route::delete('responsaveis-tecnicos/{responsavel}/excluir', [ResponsavelTecnicoController::class, 'destroy'])->name('responsaveis-tecnicos.destroy');
     });
+
+    // Cadastro rápido de responsável técnico (usado no modal do formulário de Processos) —
+    // mesma URL/nome de rota do CRUD de administração, mas acessível também a 'tecnico'.
+    Route::post('admin/responsaveis-tecnicos/salvar', [ResponsavelTecnicoController::class, 'store'])
+        ->name('admin.responsaveis-tecnicos.store')
+        ->middleware('perfil:admin,tecnico');
 });
