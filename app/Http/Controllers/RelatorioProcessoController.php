@@ -50,10 +50,15 @@ class RelatorioProcessoController extends Controller
         $dados = $this->coletarDados($request);
 
         return view('relatorios.processos.preview', array_merge($dados, [
-            'filtros' => $request->only([
-                'tipo', 'tipo_processo_id', 'fase_atual_id', 'responsavel_tecnico_id',
-                'situacao', 'data_inicio', 'data_fim',
-            ]),
+            'filtros' => array_merge(
+                $request->only([
+                    'tipo_processo_id', 'fase_atual_id', 'responsavel_tecnico_id',
+                    'situacao', 'data_inicio', 'data_fim',
+                ]),
+                ['tipo' => $dados['tipo']]
+            ),
+            'gerado_em'  => now()->format('d/m/Y H:i'),
+            'gerado_por' => auth()->user()->name,
         ]));
     }
 
@@ -93,7 +98,11 @@ class RelatorioProcessoController extends Controller
     // ──────────────────────────────────────────────────────────────
     public function exportarExcel(Request $request)
     {
-        $dados       = $this->coletarDados($request);
+        $dados = $this->coletarDados($request);
+
+        $dados['gerado_em']  = now()->format('d/m/Y H:i');
+        $dados['gerado_por'] = auth()->user()->name;
+
         $nomeArquivo = 'relatorio-processos-' . now()->format('Y-m-d-His') . '.xlsx';
 
         return Excel::download(new RelatorioProcessoExport($dados), $nomeArquivo);

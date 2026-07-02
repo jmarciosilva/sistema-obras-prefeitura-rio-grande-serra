@@ -20,6 +20,31 @@
         </a>
     </div>
 
+    {{-- ═══════════════════════════════════════════════════════
+    | CABEÇALHO DO RELATÓRIO — mesmo padrão do PDF/Excel
+    ══════════════════════════════════════════════════════════ --}}
+    <div class="rounded-xl overflow-hidden shadow-sm">
+        <div class="h-1.5 bg-blue-500"></div>
+        <div class="bg-[#1e3a5f] text-white px-6 py-5">
+            <h1 class="text-lg font-bold tracking-wide">RELATÓRIO DE PROCESSOS ADMINISTRATIVOS</h1>
+            <p class="text-sm text-white/85 mt-1">Prefeitura Municipal de Rio Grande da Serra — SP</p>
+            <p class="text-sm text-white/85">Secretaria de Obras e Planejamento</p>
+            <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-white/70 mt-3 pt-3 border-t border-white/25">
+                <span>Gerado em: {{ $gerado_em }}</span>
+                <span>Por: {{ $gerado_por }}</span>
+                <span>Processos: {{ $totalFiltrado }}</span>
+                @if (!empty($filtros['data_inicio']) || !empty($filtros['data_fim']))
+                    <span>
+                        Período:
+                        {{ !empty($filtros['data_inicio']) ? \Carbon\Carbon::parse($filtros['data_inicio'])->format('d/m/Y') : 'início' }}
+                        até
+                        {{ !empty($filtros['data_fim']) ? \Carbon\Carbon::parse($filtros['data_fim'])->format('d/m/Y') : 'hoje' }}
+                    </span>
+                @endif
+            </div>
+        </div>
+    </div>
+
     {{-- KPIs --}}
     <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
