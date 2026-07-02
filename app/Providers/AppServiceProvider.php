@@ -21,7 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Paginator::useBootstrapFive();
+        // O sistema usa Tailwind CSS em toda a interface (sem Bootstrap carregado) —
+        // "useBootstrapFive" fazia a paginação renderizar sem estilo em qualquer tela.
+        Paginator::useTailwind();
         Gate::define(
             'criar-obra',
             fn($user) =>
