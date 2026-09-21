@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/componentes.dart';
 import '../../../shared/widgets/estados.dart';
+import '../../contratos/models/contrato.dart';
+import '../../contratos/presentation/contratos_page.dart';
 import '../data/dashboard_api.dart';
 import '../models/dashboard.dart';
 
@@ -305,11 +307,13 @@ class _AlertasCard extends StatelessWidget {
           rotulo: 'Contratos vencidos',
           valor: alertas.contratosVencidos,
           icone: Icons.event_busy_outlined,
+          situacaoContratos: SituacaoVigencia.vencido,
         ),
         _LinhaAlerta(
           rotulo: 'Contratos vencendo em 30 dias',
           valor: alertas.contratosVencendo,
           icone: Icons.schedule_outlined,
+          situacaoContratos: SituacaoVigencia.venceEmBreve,
         ),
         _LinhaAlerta(
           rotulo: 'Obras em execução sem medição há 60 dias',
@@ -326,16 +330,43 @@ class _LinhaAlerta extends StatelessWidget {
     required this.rotulo,
     required this.valor,
     required this.icone,
+    this.situacaoContratos,
   });
 
   final String rotulo;
   final int valor;
   final IconData icone;
 
+  /// Se informado (e houver alertas), o toque abre a lista de contratos
+  /// já filtrada por essa situação.
+  final SituacaoVigencia? situacaoContratos;
+
+  void _abrirContratos(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          // Título genérico: o usuário pode trocar o filtro nesta tela
+          appBar: AppBar(title: const Text('Contratos')),
+          body: ContratosPage(situacaoInicial: situacaoContratos),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     final ativo = valor > 0;
+    final linha = _linha(tema, ativo);
+    if (situacaoContratos == null || !ativo) return linha;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _abrirContratos(context),
+      child: linha,
+    );
+  }
+
+  Widget _linha(ThemeData tema, bool ativo) {
     final cor = ativo ? tema.colorScheme.error : tema.colorScheme.outline;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),

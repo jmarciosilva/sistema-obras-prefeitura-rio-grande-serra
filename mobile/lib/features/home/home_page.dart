@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../shared/widgets/componentes.dart';
+import '../contratos/presentation/contratos_page.dart';
 import '../dashboard/presentation/dashboard_page.dart';
 import '../obras/presentation/obras_page.dart';
 import '../perfil/presentation/perfil_page.dart';
 
-/// Estrutura principal após o login: Dashboard · Obras · Perfil.
+/// Estrutura principal após o login: Dashboard · Obras · Contratos · Perfil.
 /// IndexedStack mantém o estado de cada aba (busca, página carregada...).
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,7 +24,12 @@ class _HomePageState extends State<HomePage> {
       appBar: const InstitucionalAppBar(),
       body: IndexedStack(
         index: _aba,
-        children: const [DashboardPage(), ObrasPage(), PerfilPage()],
+        children: const [
+          DashboardPage(),
+          ObrasPage(),
+          ContratosPage(),
+          PerfilPage(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _aba,
@@ -38,6 +44,11 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.apartment_outlined),
             selectedIcon: Icon(Icons.apartment),
             label: 'Obras',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_outlined),
+            selectedIcon: Icon(Icons.receipt_long),
+            label: 'Contratos',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

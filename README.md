@@ -216,8 +216,8 @@ Ainda não implementado da Fase 7.5: tempo médio de tramitação e processos co
 
 App Flutter **somente leitura** para Prefeito e Secretário de Obras. O Laravel continua sendo a única fonte da verdade: o app apenas consome a API, sem regra de negócio própria.
 
-- **MOB-01 — API Mobile MVP** *(implementada localmente, aguardando deploy)*: API REST versionada em `/api/v1` com Laravel Sanctum (tokens Bearer, validade de 30 dias). Endpoints: `POST login`, `POST logout`, `GET me`, `GET dashboard`, `GET obras` (`?search=`, `?status=`), `GET obras/{id}`. Reaproveita os accessors de KPIs de `Obra`; os indicadores do dashboard ficam em `App\Services\DashboardObrasService`, com as mesmas regras do `DashboardController` web — se mudar uma regra lá, mude nos dois. Testes em `tests/Feature/Api/MobileApiTest.php`.
-- **MOB-02 — Flutter MVP** *(em andamento)*: app **Obras RGS** em [`mobile/`](mobile/) (somente consulta) — login, dashboard executivo, lista de obras (busca, filtro de status, "carregar mais"), detalhe da obra, perfil e logout. Token salvo apenas no `flutter_secure_storage`; 401 leva ao login. Dependências: `dio`, `flutter_secure_storage`, `flutter_riverpod`, `intl`.
+- **MOB-01 — API Mobile MVP** *(implementada localmente, aguardando deploy)*: API REST versionada em `/api/v1` com Laravel Sanctum (tokens Bearer, validade de 30 dias). Endpoints: `POST login`, `POST logout`, `GET me`, `GET dashboard`, `GET obras` (`?search=`, `?status=`), `GET obras/{id}`, `GET contratos` (`?search=` número/obra/empresa, `?situacao=vigente|vence_em_breve|vencido|sem_vigencia`), `GET contratos/{id}`. Reaproveita os accessors de KPIs de `Obra`; os indicadores do dashboard ficam em `App\Services\DashboardObrasService`, com as mesmas regras do `DashboardController` web — se mudar uma regra lá, mude nos dois. Testes em `tests/Feature/Api/`.
+- **MOB-02 — Flutter MVP** *(em andamento)*: app **Obras RGS** em [`mobile/`](mobile/) (somente consulta) — abas **Dashboard**, **Obras**, **Contratos** e **Perfil**. Obras e Contratos têm busca, filtro (status da obra / situação da vigência), "carregar mais" e tela de detalhe; o detalhe do contrato abre a obra vinculada e os alertas de contratos no Dashboard abrem a lista já filtrada. Contratos são somente consulta (sem cadastro, edição, aditivos ou documentos). Token salvo apenas no `flutter_secure_storage`; 401 leva ao login. Dependências: `dio`, `flutter_secure_storage`, `flutter_riverpod`, `intl`.
 
   ```bash
   cd mobile
@@ -233,6 +233,7 @@ App Flutter **somente leitura** para Prefeito e Secretário de Obras. O Laravel 
 
 - **TECH-DEBT-MOB-01** — Centralizar futuramente as regras de indicadores do dashboard web e mobile em `DashboardObrasService` (hoje o `DashboardController` web mantém lógica equivalente).
 - **SEC-01** — Bloquear autenticação/acesso web de usuários inativos (problema preexistente: o login do Breeze não verifica `ativo`; só as rotas com middleware `perfil:` bloqueiam). A API mobile já bloqueia.
+- **BUG-01** — `Contrato::venceEm()` marca como "vence em breve" **qualquer** vigência futura: no Carbon 3, `diffInDays()` retorna valor com sinal (negativo para datas futuras). Afeta os selos das telas web de contratos e do detalhe da obra. A API de contratos não usa esse método (segue a regra do alerta do dashboard: vigência entre hoje e +30 dias). Correção sugerida: `now()->diffInDays($this->vigencia_contrato) <= $dias`.
 
 ---
 

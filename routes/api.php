@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\ContratoController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\ObraController;
 use Illuminate\Support\Facades\Route;
@@ -30,5 +31,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/obras/{obra}', [ObraController::class, 'show'])
             ->whereNumber('obra')
             ->name('obras.show');
+
+        Route::get('/contratos', [ContratoController::class, 'index'])->name('contratos.index');
+        Route::get('/contratos/{contrato}', [ContratoController::class, 'show'])
+            ->whereNumber('contrato')
+            ->name('contratos.show');
     });
 });
