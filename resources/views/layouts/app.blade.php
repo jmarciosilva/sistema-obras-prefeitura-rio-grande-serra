@@ -197,10 +197,14 @@
                                 {{ ucfirst(auth()->user()->perfil) }}
                             </span>
 
-                            {{-- Nome do usuário --}}
-                            <div class="text-xs text-right leading-tight">
-                                <div class="font-medium text-slate-700">{{ auth()->user()->name }}</div>
-                            </div>
+                            {{-- Nome do usuário — abre a modal "Meu perfil" --}}
+                            <button type="button" x-on:click="$dispatch('open-modal', 'meu-perfil')"
+                                title="Alterar nome, e-mail ou senha"
+                                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium
+                                       text-slate-700 hover:bg-slate-100 transition">
+                                👤 {{ auth()->user()->name }}
+                                <span class="text-slate-400">✎</span>
+                            </button>
 
                             {{-- Logout --}}
                             <form method="POST" action="{{ route('logout') }}">
@@ -259,6 +263,10 @@
 
         </div>
     </div>
+
+    @auth
+        @include('perfil._modal')
+    @endauth
 
     @stack('scripts')
 </body>
