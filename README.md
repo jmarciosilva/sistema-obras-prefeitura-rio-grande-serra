@@ -217,7 +217,16 @@ Ainda não implementado da Fase 7.5: tempo médio de tramitação e processos co
 App Flutter **somente leitura** para Prefeito e Secretário de Obras. O Laravel continua sendo a única fonte da verdade: o app apenas consome a API, sem regra de negócio própria.
 
 - **MOB-01 — API Mobile MVP** *(implementada localmente, aguardando deploy)*: API REST versionada em `/api/v1` com Laravel Sanctum (tokens Bearer, validade de 30 dias). Endpoints: `POST login`, `POST logout`, `GET me`, `GET dashboard`, `GET obras` (`?search=`, `?status=`), `GET obras/{id}`. Reaproveita os accessors de KPIs de `Obra`; os indicadores do dashboard ficam em `App\Services\DashboardObrasService`, com as mesmas regras do `DashboardController` web — se mudar uma regra lá, mude nos dois. Testes em `tests/Feature/Api/MobileApiTest.php`.
-- **MOB-02 — Flutter MVP** *(não iniciado)*: login, dashboard executivo, lista e detalhe de obras.
+- **MOB-02 — Flutter MVP** *(em andamento)*: app **Obras RGS** em [`mobile/`](mobile/) (somente consulta) — login, dashboard executivo, lista de obras (busca, filtro de status, "carregar mais"), detalhe da obra, perfil e logout. Token salvo apenas no `flutter_secure_storage`; 401 leva ao login. Dependências: `dio`, `flutter_secure_storage`, `flutter_riverpod`, `intl`.
+
+  ```bash
+  cd mobile
+  flutter pub get
+  flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # Android Emulator + php artisan serve
+  flutter test
+  ```
+
+  Sem `API_BASE_URL`, o app usa `http://10.0.2.2:8000` no Android e `http://localhost:8000` nas demais plataformas (`lib/core/config/app_config.dart`). HTTP sem TLS é liberado **só no build debug** (`android/app/src/debug/AndroidManifest.xml`); release exige HTTPS. O `applicationId` `com.example.obras_rgs` é provisório e precisa ser trocado antes de publicar na loja.
 - **MOB-03 — Homologação e Produção** *(não iniciado)*: validação com usuários reais, deploy da API e distribuição do app.
 
 **Pendências registradas:**
