@@ -212,6 +212,21 @@ Ainda não implementado da Fase 7.5: tempo médio de tramitação e processos co
 
 ---
 
+## 📱 FASE 8 — Aplicativo Mobile Executivo
+
+App Flutter **somente leitura** para Prefeito e Secretário de Obras. O Laravel continua sendo a única fonte da verdade: o app apenas consome a API, sem regra de negócio própria.
+
+- **MOB-01 — API Mobile MVP** *(implementada localmente, aguardando deploy)*: API REST versionada em `/api/v1` com Laravel Sanctum (tokens Bearer, validade de 30 dias). Endpoints: `POST login`, `POST logout`, `GET me`, `GET dashboard`, `GET obras` (`?search=`, `?status=`), `GET obras/{id}`. Reaproveita os accessors de KPIs de `Obra`; os indicadores do dashboard ficam em `App\Services\DashboardObrasService`, com as mesmas regras do `DashboardController` web — se mudar uma regra lá, mude nos dois. Testes em `tests/Feature/Api/MobileApiTest.php`.
+- **MOB-02 — Flutter MVP** *(não iniciado)*: login, dashboard executivo, lista e detalhe de obras.
+- **MOB-03 — Homologação e Produção** *(não iniciado)*: validação com usuários reais, deploy da API e distribuição do app.
+
+**Pendências registradas:**
+
+- **TECH-DEBT-MOB-01** — Centralizar futuramente as regras de indicadores do dashboard web e mobile em `DashboardObrasService` (hoje o `DashboardController` web mantém lógica equivalente).
+- **SEC-01** — Bloquear autenticação/acesso web de usuários inativos (problema preexistente: o login do Breeze não verifica `ativo`; só as rotas com middleware `perfil:` bloqueiam). A API mobile já bloqueia.
+
+---
+
 ## 🗄️ Banco de Dados
 
 ```
