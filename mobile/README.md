@@ -4,7 +4,8 @@ Aplicativo somente consulta para Prefeito e Secretário de Obras, consumindo a A
 
 ```bash
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # Android Emulator + php artisan serve
+flutter run                                                    # API de produção (padrão)
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # Android Emulator + php artisan serve local
 flutter test
 ```
 

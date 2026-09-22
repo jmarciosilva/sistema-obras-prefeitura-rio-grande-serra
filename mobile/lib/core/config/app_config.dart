@@ -1,12 +1,12 @@
-import 'package:flutter/foundation.dart';
-
 /// Configuração central do app.
 ///
-/// A URL da API vem de `--dart-define=API_BASE_URL=...`. Sem ela, usa o
-/// servidor local de desenvolvimento (`php artisan serve`):
-///  - Android Emulator: http://10.0.2.2:8000 (localhost do Windows visto
-///    de dentro do emulador)
-///  - demais plataformas: http://localhost:8000
+/// A API padrão é a de PRODUÇÃO ([producao]). Para desenvolver contra o
+/// servidor local (`php artisan serve`), use `--dart-define`:
+///  - Android Emulator: `--dart-define=API_BASE_URL=http://10.0.2.2:8000`
+///    (localhost do Windows visto de dentro do emulador)
+///  - demais plataformas: `--dart-define=API_BASE_URL=http://localhost:8000`
+///
+/// HTTP sem TLS só funciona no build debug; release exige HTTPS.
 class AppConfig {
   AppConfig._();
 
@@ -16,17 +16,16 @@ class AppConfig {
     'API_BASE_URL',
   );
 
-  /// URL do servidor, sem barra final. Ex.: http://10.0.2.2:8000
+  /// Servidor de produção (Hostinger).
+  static const String producao = 'https://prefeitura.jmfsystem.com';
+
+  /// URL do servidor, sem barra final.
   static String get apiBaseUrl {
-    final url = _apiBaseUrlDefine.isNotEmpty
-        ? _apiBaseUrlDefine
-        : (!kIsWeb && defaultTargetPlatform == TargetPlatform.android
-              ? 'http://10.0.2.2:8000'
-              : 'http://localhost:8000');
+    final url = _apiBaseUrlDefine.isNotEmpty ? _apiBaseUrlDefine : producao;
     return url.replaceAll(RegExp(r'/+$'), '');
   }
 
-  /// Raiz da API versionada. Ex.: http://10.0.2.2:8000/api/v1
+  /// Raiz da API versionada. Ex.: https://prefeitura.jmfsystem.com/api/v1
   static String get apiUrl => '$apiBaseUrl/api/v1';
 
   static const Duration connectTimeout = Duration(seconds: 10);
