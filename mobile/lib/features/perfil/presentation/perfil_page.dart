@@ -63,7 +63,22 @@ class _PerfilPageState extends ConsumerState<PerfilPage> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        Text(
+          user.name,
+          textAlign: TextAlign.center,
+          style: tema.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          user.perfilLabel,
+          textAlign: TextAlign.center,
+          style: tema.textTheme.bodyMedium?.copyWith(
+            color: tema.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 20),
         Card(
           child: Column(
             children: [

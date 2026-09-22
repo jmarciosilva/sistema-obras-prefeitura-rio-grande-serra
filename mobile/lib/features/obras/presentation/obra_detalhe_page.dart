@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/utils/formatters.dart';
 import '../../../shared/widgets/componentes.dart';
 import '../../../shared/widgets/estados.dart';
+import '../../contratos/presentation/contrato_detalhe_page.dart';
 import '../data/obras_api.dart';
 import '../models/obra_detalhe.dart';
 
@@ -18,7 +19,7 @@ class ObraDetalhePage extends ConsumerWidget {
     final detalhe = ref.watch(obraDetalheProvider(id));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Detalhe da obra')),
+      appBar: const InstitucionalAppBar(titulo: 'Detalhe da obra'),
       body: detalhe.when(
         skipLoadingOnRefresh: !detalhe.hasError,
         loading: () => const LoadingView(),
@@ -53,25 +54,34 @@ class _Conteudo extends StatelessWidget {
     final obra = detalhe.obra;
 
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       children: [
+        // 1 — Obra
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(obra.descricao, style: tema.textTheme.titleMedium),
-                const SizedBox(height: 10),
-                if (obra.status != null)
+                Text(
+                  obra.descricao,
+                  // Descrições costumam ser longas (e em caixa alta)
+                  style: tema.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+                if (obra.status != null) ...[
+                  const SizedBox(height: 12),
                   StatusChip(nome: obra.status!.nome, cor: obra.status!.cor),
+                ],
                 const SizedBox(height: 12),
-                _IconeTexto(
+                LinhaIcone(
                   icone: Icons.place_outlined,
                   texto: obra.endereco ?? 'Endereço não informado',
                 ),
                 if (detalhe.processoExecucao != null)
-                  _IconeTexto(
+                  LinhaIcone(
                     icone: Icons.description_outlined,
                     texto: 'Processo ${detalhe.processoExecucao}',
                   ),
@@ -79,79 +89,76 @@ class _Conteudo extends StatelessWidget {
             ),
           ),
         ),
+
+        // 2 — Execução financeira
         SecaoCard(
           titulo: 'Execução financeira',
           icone: Icons.trending_up,
-          child: Column(
-            children: [
-              BarraPercentual(percentual: obra.percentualExecutado, altura: 12),
-              const SizedBox(height: 12),
-              LinhaInfo(
-                rotulo: 'Valor contratado',
-                valor: Fmt.moeda(obra.valorContratado),
-                destaque: true,
-              ),
-              LinhaInfo(
-                rotulo: 'Valor medido',
-                valor: Fmt.moeda(obra.valorMedido),
-                destaque: true,
-              ),
-              LinhaInfo(
-                rotulo: 'Saldo',
-                valor: Fmt.moeda(obra.saldo),
-                destaque: true,
-              ),
-            ],
+          child: ResumoFinanceiro(
+            percentual: obra.percentualExecutado,
+            contratado: obra.valorContratado,
+            medido: obra.valorMedido,
+            saldo: obra.saldo,
           ),
         ),
+
+        // 3 — Contratos vinculados
         SecaoCard(
           titulo: detalhe.contratos.length > 1
               ? 'Contratos (${detalhe.contratos.length})'
               : 'Contrato',
-          icone: Icons.assignment_outlined,
+          icone: Icons.receipt_long_outlined,
           child: detalhe.contratos.isEmpty
-              ? const Text('Nenhum contrato cadastrado.')
+              ? const VazioInline(
+                  texto: 'Nenhum contrato cadastrado.',
+                  icone: Icons.receipt_long_outlined,
+                )
               : Column(
                   children: [
                     for (final (i, c) in detalhe.contratos.indexed) ...[
-                      if (i > 0) const Divider(height: 24),
-                      _ContratoInfo(contrato: c),
+                      if (i > 0) const Divider(height: 16),
+                      _ContratoResumo(contrato: c),
                     ],
                   ],
                 ),
         ),
+
+        // 4 — Últimas medições
         SecaoCard(
           titulo: 'Últimas medições',
           icone: Icons.straighten,
           child: detalhe.ultimasMedicoes.isEmpty
-              ? const Text('Nenhuma medição registrada.')
+              ? const VazioInline(
+                  texto: 'Nenhuma medição registrada.',
+                  icone: Icons.event_note_outlined,
+                )
               : Column(
                   children: [
-                    for (final m in detalhe.ultimasMedicoes)
-                      ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.event_note_outlined),
-                        title: Text(Fmt.data(m.dataMedicao)),
-                        subtitle: m.numeroContrato == null
-                            ? null
-                            : Text('Contrato ${m.numeroContrato}'),
-                        trailing: Text(
-                          Fmt.moeda(m.valorMedido),
-                          style: tema.textTheme.titleSmall,
-                        ),
+                    for (final (i, m) in detalhe.ultimasMedicoes.indexed) ...[
+                      if (i > 0) const Divider(height: 1),
+                      LinhaMedicao(
+                        data: m.dataMedicao,
+                        valor: m.valorMedido,
+                        // Contrato só é útil quando a obra tem mais de um
+                        contexto:
+                            detalhe.contratos.length > 1 &&
+                                m.numeroContrato != null
+                            ? 'Contrato ${m.numeroContrato}'
+                            : null,
                       ),
+                    ],
                   ],
                 ),
         ),
-        const SizedBox(height: 12),
       ],
     );
   }
 }
 
-class _ContratoInfo extends StatelessWidget {
-  const _ContratoInfo({required this.contrato});
+/// Resumo de um contrato vinculado; o toque abre o detalhe do contrato
+/// (datas, processo e empresa completos ficam lá).
+class _ContratoResumo extends StatelessWidget {
+  const _ContratoResumo({required this.contrato});
 
   final Contrato contrato;
 
@@ -159,74 +166,98 @@ class _ContratoInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     final c = contrato;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => ContratoDetalhePage(id: c.id)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
           children: [
             Expanded(
-              child: Text(
-                c.numeroContrato != null
-                    ? 'Contrato ${c.numeroContrato}'
-                    : 'Contrato sem número',
-                style: tema.textTheme.titleSmall,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          c.numeroContrato != null
+                              ? 'Contrato ${c.numeroContrato}'
+                              : 'Contrato sem número',
+                          style: tema.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (c.vencido) const _SeloVencido(),
+                    ],
+                  ),
+                  if (c.empresa != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      c.empresa!.nome,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tema.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  LinhaIcone(
+                    icone: Icons.event_outlined,
+                    texto: c.vigenciaContrato == null
+                        ? 'Vigência não informada'
+                        : 'Vigência até ${Fmt.data(c.vigenciaContrato)}',
+                  ),
+                  const SizedBox(height: 4),
+                  LinhaInfo(
+                    rotulo: 'Contratado',
+                    valor: Fmt.moeda(c.valorContrato),
+                  ),
+                  LinhaInfo(rotulo: 'Medido', valor: Fmt.moeda(c.valorMedido)),
+                ],
               ),
             ),
-            if (c.vencido)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: tema.colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'Vigência vencida',
-                  style: tema.textTheme.labelSmall?.copyWith(
-                    color: tema.colorScheme.onErrorContainer,
-                  ),
-                ),
-              ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, color: tema.colorScheme.onSurfaceVariant),
           ],
         ),
-        const SizedBox(height: 6),
-        LinhaInfo(rotulo: 'Empresa', valor: c.empresa?.nome ?? '—'),
-        if (c.empresa?.cnpj != null)
-          LinhaInfo(rotulo: 'CNPJ', valor: c.empresa!.cnpj!),
-        if (c.processoLicitacao != null)
-          LinhaInfo(
-            rotulo: 'Processo licitatório',
-            valor: c.processoLicitacao!,
-          ),
-        LinhaInfo(rotulo: 'Assinatura', valor: Fmt.data(c.dataAssinatura)),
-        LinhaInfo(rotulo: 'Ordem de início', valor: Fmt.data(c.ordemInicio)),
-        LinhaInfo(rotulo: 'Vigência até', valor: Fmt.data(c.vigenciaContrato)),
-        LinhaInfo(
-          rotulo: 'Valor do contrato',
-          valor: Fmt.moeda(c.valorContrato),
-        ),
-        LinhaInfo(rotulo: 'Valor medido', valor: Fmt.moeda(c.valorMedido)),
-      ],
+      ),
     );
   }
 }
 
-class _IconeTexto extends StatelessWidget {
-  const _IconeTexto({required this.icone, required this.texto});
-
-  final IconData icone;
-  final String texto;
+/// Selo "Vencido" com ícone (não depende só da cor).
+class _SeloVencido extends StatelessWidget {
+  const _SeloVencido();
 
   @override
   Widget build(BuildContext context) {
-    final tema = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
+    final cores = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 2, 8, 2),
+      decoration: BoxDecoration(
+        color: cores.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icone, size: 18, color: tema.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Expanded(child: Text(texto, style: tema.textTheme.bodyMedium)),
+          Icon(
+            Icons.event_busy_outlined,
+            size: 14,
+            color: cores.onErrorContainer,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Vencido',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: cores.onErrorContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

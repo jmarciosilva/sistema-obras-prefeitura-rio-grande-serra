@@ -56,9 +56,35 @@ class ObrasApp extends ConsumerWidget {
         backgroundColor: esquema.primary,
         foregroundColor: esquema.onPrimary,
       ),
-      cardTheme: const CardThemeData(
-        elevation: 0.5,
-        margin: EdgeInsets.symmetric(vertical: 6),
+      // Cards brancos com borda sutil: separação limpa sem sombras pesadas
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: esquema.surfaceContainerLowest,
+        surfaceTintColor: Colors.transparent,
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: esquema.outlineVariant.withValues(alpha: 0.6),
+          ),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: esquema.outlineVariant.withValues(alpha: 0.6),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: esquema.surfaceContainerLowest,
+        indicatorColor: esquema.primaryContainer,
+        surfaceTintColor: Colors.transparent,
+        elevation: 3,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: esquema.surfaceContainerLowest,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      chipTheme: ChipThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }

@@ -38,7 +38,9 @@ class ErrorView extends StatelessWidget {
 
     return _Centro(
       icone: semConexao ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
-      titulo: semConexao ? 'Sem conexão' : 'Erro ao carregar dados',
+      titulo: semConexao
+          ? 'Sem conexão'
+          : 'Não foi possível carregar os dados.',
       mensagem: mensagemDeErro(erro),
       acao: FilledButton.icon(
         onPressed: onRetry,
@@ -54,13 +56,18 @@ class EmptyView extends StatelessWidget {
     super.key,
     required this.mensagem,
     this.icone = Icons.inbox_outlined,
+    this.detalhe,
   });
 
   final String mensagem;
   final IconData icone;
 
+  /// Dica secundária (ex.: "Tente outra busca ou filtro.").
+  final String? detalhe;
+
   @override
-  Widget build(BuildContext context) => _Centro(icone: icone, titulo: mensagem);
+  Widget build(BuildContext context) =>
+      _Centro(icone: icone, titulo: mensagem, mensagem: detalhe);
 }
 
 class _Centro extends StatelessWidget {
@@ -85,7 +92,14 @@ class _Centro extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icone, size: 56, color: tema.colorScheme.outline),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: tema.colorScheme.surfaceContainerHighest,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icone, size: 40, color: tema.colorScheme.outline),
+            ),
             const SizedBox(height: 16),
             Text(
               titulo,
@@ -96,7 +110,9 @@ class _Centro extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 mensagem!,
-                style: tema.textTheme.bodyMedium,
+                style: tema.textTheme.bodyMedium?.copyWith(
+                  color: tema.colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],

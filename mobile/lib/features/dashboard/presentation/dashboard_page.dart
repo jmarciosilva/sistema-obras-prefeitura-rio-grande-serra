@@ -6,9 +6,12 @@ import '../../../shared/widgets/componentes.dart';
 import '../../../shared/widgets/estados.dart';
 import '../../contratos/models/contrato.dart';
 import '../../contratos/presentation/contratos_page.dart';
+import '../../obras/presentation/obras_page.dart';
 import '../data/dashboard_api.dart';
 import '../models/dashboard.dart';
 
+/// Painel Executivo: Resumo · Execução financeira · Obras · Contratos ·
+/// Pontos de atenção. Tudo vem de uma única chamada (`GET /dashboard`).
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
 
@@ -33,18 +36,29 @@ class DashboardPage extends ConsumerWidget {
           }
         },
         child: ListView(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
           children: [
-            _Titulo(atualizadoEm: d.atualizadoEm),
-            _PercentualGeral(resumo: d.obras),
-            const SizedBox(height: 4),
-            _Contagens(resumo: d.obras),
-            const SizedBox(height: 4),
-            _Financeiro(resumo: d.obras),
-            _PorStatus(status: d.status, total: d.obras.total),
+            _Cabecalho(atualizadoEm: d.atualizadoEm),
+            const TituloSecao('Resumo geral'),
+            _ResumoGeral(dashboard: d),
+            const TituloSecao('Execução financeira'),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ResumoFinanceiro(
+                  percentual: d.obras.percentualExecutado,
+                  contratado: d.obras.valorContratado,
+                  medido: d.obras.valorMedido,
+                  saldo: d.obras.saldo,
+                ),
+              ),
+            ),
+            const TituloSecao('Obras'),
+            _ObrasCard(resumo: d.obras, status: d.status),
+            const TituloSecao('Contratos'),
             _ContratosCard(resumo: d.contratos),
-            _AlertasCard(alertas: d.alertas),
-            const SizedBox(height: 12),
+            const TituloSecao('Pontos de atenção'),
+            _PontosDeAtencao(alertas: d.alertas),
           ],
         ),
       ),
@@ -52,8 +66,48 @@ class DashboardPage extends ConsumerWidget {
   }
 }
 
-class _Titulo extends StatelessWidget {
-  const _Titulo({this.atualizadoEm});
+// ── Navegação (somente consulta: abre listas já existentes) ──────────
+
+/// Abre a lista de Contratos (opcionalmente já filtrada), usada pela seção
+/// de Contratos e pelos pontos de atenção.
+void _abrirContratos(BuildContext context, SituacaoVigencia? situacao) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => Scaffold(
+        // Título genérico: o usuário pode trocar o filtro nesta tela
+        appBar: const InstitucionalAppBar(titulo: 'Contratos'),
+        body: ContratosPage(situacaoInicial: situacao),
+      ),
+    ),
+  );
+}
+
+/// Abre a lista de Obras (opcionalmente já filtrada por status).
+void _abrirObras(BuildContext context, int? statusId) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => Scaffold(
+        appBar: const InstitucionalAppBar(titulo: 'Obras'),
+        body: ObrasPage(statusInicial: statusId),
+      ),
+    ),
+  );
+}
+
+/// Status cujo nome contém [trecho] — mesma regra do backend (`like %Execu%`).
+/// Só devolve o id quando há exatamente um status correspondente; caso
+/// contrário a lista de Obras não tem um filtro equivalente.
+int? _statusUnico(List<StatusQuantidade> status, String trecho) {
+  final achados = status
+      .where((s) => s.nome.toLowerCase().contains(trecho))
+      .toList();
+  return achados.length == 1 ? achados.first.id : null;
+}
+
+// ── Cabeçalho ────────────────────────────────────────────────────────
+
+class _Cabecalho extends StatelessWidget {
+  const _Cabecalho({this.atualizadoEm});
 
   final DateTime? atualizadoEm;
 
@@ -61,65 +115,277 @@ class _Titulo extends StatelessWidget {
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text('Painel Executivo', style: tema.textTheme.titleLarge),
-          ),
-          if (atualizadoEm != null)
-            Text(
-              'Atualizado ${Fmt.dataHora(atualizadoEm)}',
-              style: tema.textTheme.bodySmall,
+          Text(
+            'Painel Executivo',
+            style: tema.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
+          ),
+          if (atualizadoEm != null) ...[
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Icon(
+                  Icons.update,
+                  size: 16,
+                  color: tema.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Atualizado em ${Fmt.dataHora(atualizadoEm)}',
+                  style: tema.textTheme.bodySmall?.copyWith(
+                    color: tema.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _PercentualGeral extends StatelessWidget {
-  const _PercentualGeral({required this.resumo});
+// ── 1. Resumo geral ──────────────────────────────────────────────────
+
+class _ResumoGeral extends StatelessWidget {
+  const _ResumoGeral({required this.dashboard});
+
+  final Dashboard dashboard;
+
+  @override
+  Widget build(BuildContext context) {
+    final obras = dashboard.obras;
+    final emExecucao = _statusUnico(dashboard.status, 'execu');
+    final concluidas = _statusUnico(dashboard.status, 'conclu');
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            _KpiTile(
+              rotulo: 'Total de obras',
+              valor: obras.total,
+              icone: Icons.apartment_outlined,
+              onTap: () => _abrirObras(context, null),
+            ),
+            const SizedBox(width: 8),
+            _KpiTile(
+              rotulo: 'Obras em execução',
+              valor: obras.emExecucao,
+              icone: Icons.engineering_outlined,
+              onTap: emExecucao == null
+                  ? null
+                  : () => _abrirObras(context, emExecucao),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _KpiTile(
+              rotulo: 'Obras concluídas',
+              valor: obras.concluidas,
+              icone: Icons.task_alt_outlined,
+              onTap: concluidas == null
+                  ? null
+                  : () => _abrirObras(context, concluidas),
+            ),
+            const SizedBox(width: 8),
+            _KpiTile(
+              rotulo: 'Total de contratos',
+              valor: dashboard.contratos.total,
+              icone: Icons.receipt_long_outlined,
+              onTap: () => _abrirContratos(context, null),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _KpiTile extends StatelessWidget {
+  const _KpiTile({
+    required this.rotulo,
+    required this.valor,
+    required this.icone,
+    this.onTap,
+  });
+
+  final String rotulo;
+  final int valor;
+  final IconData icone;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return Expanded(
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: tema.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        icone,
+                        size: 20,
+                        color: tema.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (onTap != null)
+                      Icon(
+                        Icons.chevron_right,
+                        size: 20,
+                        color: tema.colorScheme.outline,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  Fmt.inteiro(valor),
+                  style: tema.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  rotulo,
+                  maxLines: 2,
+                  style: tema.textTheme.bodyMedium?.copyWith(
+                    color: tema.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 3. Obras ─────────────────────────────────────────────────────────
+
+class _ObrasCard extends StatelessWidget {
+  const _ObrasCard({required this.resumo, required this.status});
 
   final ResumoObras resumo;
+  final List<StatusQuantidade> status;
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     return Card(
-      color: tema.colorScheme.primaryContainer,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Execução financeira geral',
-              style: tema.textTheme.titleSmall?.copyWith(
-                color: tema.colorScheme.onPrimaryContainer,
+              '${Fmt.inteiro(resumo.total)} obras · '
+              '${Fmt.inteiro(resumo.emExecucao)} em execução · '
+              '${Fmt.inteiro(resumo.concluidas)} concluídas',
+              style: tema.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
-              Fmt.percentual(resumo.percentualExecutado),
-              style: tema.textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: tema.colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(height: 12),
-            BarraPercentual(
-              percentual: resumo.percentualExecutado,
-              altura: 12,
-              mostrarTexto: false,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Medido ${Fmt.moeda(resumo.valorMedido)} '
-              'de ${Fmt.moeda(resumo.valorContratado)}',
+              'Distribuição por status',
               style: tema.textTheme.bodySmall?.copyWith(
-                color: tema.colorScheme.onPrimaryContainer,
+                color: tema.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (status.isEmpty)
+              const VazioInline(texto: 'Nenhum status cadastrado.')
+            else
+              for (final s in status)
+                _LinhaStatus(status: s, total: resumo.total),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Linha de status; o toque abre a lista de Obras filtrada por ele.
+class _LinhaStatus extends StatelessWidget {
+  const _LinhaStatus({required this.status, required this.total});
+
+  final StatusQuantidade status;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    final s = status;
+    final vazio = s.total == 0;
+    final cor = Fmt.cor(s.cor);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: vazio ? null : () => _abrirObras(context, s.id),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: cor, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    s.nome,
+                    style: tema.textTheme.bodyMedium?.copyWith(
+                      color: vazio ? tema.colorScheme.onSurfaceVariant : null,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  Fmt.inteiro(s.total),
+                  style: tema.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: vazio ? tema.colorScheme.onSurfaceVariant : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 20),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: total > 0 ? s.total / total : 0,
+                  minHeight: 6,
+                  color: cor,
+                  backgroundColor: tema.colorScheme.surfaceContainerHighest,
+                ),
               ),
             ),
           ],
@@ -129,183 +395,7 @@ class _PercentualGeral extends StatelessWidget {
   }
 }
 
-class _Contagens extends StatelessWidget {
-  const _Contagens({required this.resumo});
-
-  final ResumoObras resumo;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      _Numero(
-        rotulo: 'Total de obras',
-        valor: resumo.total,
-        icone: Icons.apartment_outlined,
-      ),
-      _Numero(
-        rotulo: 'Em execução',
-        valor: resumo.emExecucao,
-        icone: Icons.engineering_outlined,
-      ),
-      _Numero(
-        rotulo: 'Concluídas',
-        valor: resumo.concluidas,
-        icone: Icons.task_alt_outlined,
-      ),
-    ],
-  );
-}
-
-class _Numero extends StatelessWidget {
-  const _Numero({
-    required this.rotulo,
-    required this.valor,
-    required this.icone,
-  });
-
-  final String rotulo;
-  final int valor;
-  final IconData icone;
-
-  @override
-  Widget build(BuildContext context) {
-    final tema = Theme.of(context);
-    return Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-          child: Column(
-            children: [
-              Icon(icone, color: tema.colorScheme.primary),
-              const SizedBox(height: 6),
-              Text(
-                Fmt.inteiro(valor),
-                style: tema.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                rotulo,
-                textAlign: TextAlign.center,
-                style: tema.textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Financeiro extends StatelessWidget {
-  const _Financeiro({required this.resumo});
-
-  final ResumoObras resumo;
-
-  @override
-  Widget build(BuildContext context) => SecaoCard(
-    titulo: 'Financeiro',
-    icone: Icons.account_balance_wallet_outlined,
-    child: Column(
-      children: [
-        LinhaInfo(
-          rotulo: 'Valor contratado',
-          valor: Fmt.moeda(resumo.valorContratado),
-          destaque: true,
-        ),
-        LinhaInfo(
-          rotulo: 'Valor medido',
-          valor: Fmt.moeda(resumo.valorMedido),
-          destaque: true,
-        ),
-        LinhaInfo(
-          rotulo: 'Saldo',
-          valor: Fmt.moeda(resumo.saldo),
-          destaque: true,
-        ),
-      ],
-    ),
-  );
-}
-
-class _PorStatus extends StatelessWidget {
-  const _PorStatus({required this.status, required this.total});
-
-  final List<StatusQuantidade> status;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    final tema = Theme.of(context);
-    return SecaoCard(
-      titulo: 'Obras por status',
-      icone: Icons.donut_small_outlined,
-      child: status.isEmpty
-          ? const Text('Nenhum status cadastrado.')
-          : Column(
-              children: [
-                for (final s in status)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: Fmt.cor(s.cor),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                s.nome,
-                                style: tema.textTheme.bodyMedium,
-                              ),
-                            ),
-                            Text(
-                              Fmt.inteiro(s.total),
-                              style: tema.textTheme.titleSmall,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: total > 0 ? s.total / total : 0,
-                            minHeight: 6,
-                            color: Fmt.cor(s.cor),
-                            backgroundColor:
-                                tema.colorScheme.surfaceContainerHighest,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-    );
-  }
-}
-
-/// Abre a lista de Contratos (opcionalmente já filtrada), usada pela seção
-/// de Contratos e pelos alertas.
-void _abrirContratos(BuildContext context, SituacaoVigencia? situacao) {
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => Scaffold(
-        // Título genérico: o usuário pode trocar o filtro nesta tela
-        appBar: AppBar(title: const Text('Contratos')),
-        body: ContratosPage(situacaoInicial: situacao),
-      ),
-    ),
-  );
-}
+// ── 4. Contratos ─────────────────────────────────────────────────────
 
 class _ContratosCard extends StatelessWidget {
   const _ContratosCard({required this.resumo});
@@ -315,66 +405,72 @@ class _ContratosCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
-    return SecaoCard(
-      titulo: 'Contratos',
-      icone: Icons.description_outlined,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _KpiContrato(rotulo: 'Total', valor: resumo.total),
-              _KpiContrato(
-                rotulo: 'Vigentes',
-                valor: resumo.vigentes,
-                situacao: SituacaoVigencia.vigente,
+    return Card(
+      key: const Key('dashboard-contratos'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _KpiContrato(rotulo: 'Total', valor: resumo.total),
+                _KpiContrato(
+                  rotulo: 'Vigentes',
+                  valor: resumo.vigentes,
+                  situacao: SituacaoVigencia.vigente,
+                ),
+                _KpiContrato(
+                  rotulo: 'Vencendo',
+                  valor: resumo.venceEmBreve,
+                  situacao: SituacaoVigencia.venceEmBreve,
+                ),
+                _KpiContrato(
+                  rotulo: 'Vencidos',
+                  valor: resumo.vencidos,
+                  situacao: SituacaoVigencia.vencido,
+                ),
+              ],
+            ),
+            if (resumo.semVigencia > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                child: Text(
+                  '${Fmt.inteiro(resumo.semVigencia)} sem vigência informada',
+                  style: tema.textTheme.bodySmall?.copyWith(
+                    color: tema.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
-              _KpiContrato(
-                rotulo: 'Vencendo',
-                valor: resumo.venceEmBreve,
-                situacao: SituacaoVigencia.venceEmBreve,
-                alerta: true,
-              ),
-              _KpiContrato(
-                rotulo: 'Vencidos',
-                valor: resumo.vencidos,
-                situacao: SituacaoVigencia.vencido,
-                alerta: true,
-              ),
-            ],
-          ),
-          if (resumo.semVigencia > 0)
+            const Divider(height: 24),
             Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                '${Fmt.inteiro(resumo.semVigencia)} sem vigência informada',
-                style: tema.textTheme.bodySmall,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Execução financeira dos contratos',
+                    style: tema.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  BarraPercentual(percentual: resumo.percentualExecutado),
+                  const SizedBox(height: 8),
+                  LinhaInfo(
+                    rotulo: 'Valor contratado',
+                    valor: Fmt.moeda(resumo.valorContratado),
+                  ),
+                  LinhaInfo(
+                    rotulo: 'Valor medido',
+                    valor: Fmt.moeda(resumo.valorMedido),
+                  ),
+                  LinhaInfo(rotulo: 'Saldo', valor: Fmt.moeda(resumo.saldo)),
+                ],
               ),
             ),
-          const Divider(height: 24),
-          Text(
-            'Execução financeira dos contratos',
-            style: tema.textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          BarraPercentual(percentual: resumo.percentualExecutado),
-          const SizedBox(height: 8),
-          LinhaInfo(
-            rotulo: 'Valor contratado',
-            valor: Fmt.moeda(resumo.valorContratado),
-            destaque: true,
-          ),
-          LinhaInfo(
-            rotulo: 'Valor medido',
-            valor: Fmt.moeda(resumo.valorMedido),
-            destaque: true,
-          ),
-          LinhaInfo(
-            rotulo: 'Saldo',
-            valor: Fmt.moeda(resumo.saldo),
-            destaque: true,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -387,43 +483,51 @@ class _KpiContrato extends StatelessWidget {
     required this.rotulo,
     required this.valor,
     this.situacao,
-    this.alerta = false,
   });
 
   final String rotulo;
   final int valor;
   final SituacaoVigencia? situacao;
 
-  /// Destaca em cor de erro quando houver contratos nessa situação.
-  final bool alerta;
-
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
-    final cor = alerta && valor > 0
-        ? tema.colorScheme.error
-        : tema.colorScheme.primary;
+    // Cor só quando há algo a observar; vencidos em vermelho, vencendo em
+    // tom de atenção. Zero fica neutro.
+    final cor = switch (situacao) {
+      SituacaoVigencia.vencido when valor > 0 => tema.colorScheme.error,
+      SituacaoVigencia.venceEmBreve when valor > 0 => tema.colorScheme.tertiary,
+      _ => tema.colorScheme.onSurface,
+    };
     return Expanded(
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         onTap: () => _abrirContratos(context, situacao),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-          child: Column(
-            children: [
-              Text(
-                Fmt.inteiro(valor),
-                style: tema.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: cor,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 72),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  Fmt.inteiro(valor),
+                  style: tema.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: cor,
+                  ),
                 ),
-              ),
-              Text(
-                rotulo,
-                textAlign: TextAlign.center,
-                style: tema.textTheme.bodySmall,
-              ),
-            ],
+                Text(
+                  rotulo,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: tema.textTheme.bodyMedium?.copyWith(
+                    color: tema.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -431,96 +535,158 @@ class _KpiContrato extends StatelessWidget {
   }
 }
 
-class _AlertasCard extends StatelessWidget {
-  const _AlertasCard({required this.alertas});
+// ── 5. Pontos de atenção ─────────────────────────────────────────────
+
+enum _Gravidade { erro, atencao }
+
+class _PontosDeAtencao extends StatelessWidget {
+  const _PontosDeAtencao({required this.alertas});
 
   final Alertas alertas;
 
   @override
-  Widget build(BuildContext context) => SecaoCard(
-    titulo: 'Alertas',
-    icone: Icons.notification_important_outlined,
-    child: Column(
-      children: [
-        _LinhaAlerta(
-          rotulo: 'Contratos vencidos',
-          valor: alertas.contratosVencidos,
-          icone: Icons.event_busy_outlined,
-          situacaoContratos: SituacaoVigencia.vencido,
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          children: [
+            if (alertas.total == 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      color: tema.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Nenhum ponto de atenção no momento.',
+                        style: tema.textTheme.bodyLarge,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            _LinhaAtencao(
+              rotulo: 'Contratos vencidos',
+              valor: alertas.contratosVencidos,
+              icone: Icons.event_busy_outlined,
+              gravidade: _Gravidade.erro,
+              situacaoContratos: SituacaoVigencia.vencido,
+            ),
+            const Divider(height: 1, indent: 64),
+            _LinhaAtencao(
+              rotulo: 'Contratos vencendo em 30 dias',
+              valor: alertas.contratosVencendo,
+              icone: Icons.schedule_outlined,
+              gravidade: _Gravidade.atencao,
+              situacaoContratos: SituacaoVigencia.venceEmBreve,
+            ),
+            const Divider(height: 1, indent: 64),
+            _LinhaAtencao(
+              rotulo: 'Obras sem medição há 60 dias',
+              detalhe: 'Obras em execução',
+              valor: alertas.obrasSemMedicao,
+              icone: Icons.pending_actions_outlined,
+              gravidade: _Gravidade.atencao,
+            ),
+          ],
         ),
-        _LinhaAlerta(
-          rotulo: 'Contratos vencendo em 30 dias',
-          valor: alertas.contratosVencendo,
-          icone: Icons.schedule_outlined,
-          situacaoContratos: SituacaoVigencia.venceEmBreve,
-        ),
-        _LinhaAlerta(
-          rotulo: 'Obras em execução sem medição há 60 dias',
-          valor: alertas.obrasSemMedicao,
-          icone: Icons.pending_actions_outlined,
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
-class _LinhaAlerta extends StatelessWidget {
-  const _LinhaAlerta({
+class _LinhaAtencao extends StatelessWidget {
+  const _LinhaAtencao({
     required this.rotulo,
     required this.valor,
     required this.icone,
+    required this.gravidade,
+    this.detalhe,
     this.situacaoContratos,
   });
 
   final String rotulo;
+  final String? detalhe;
   final int valor;
   final IconData icone;
+  final _Gravidade gravidade;
 
-  /// Se informado (e houver alertas), o toque abre a lista de contratos
+  /// Se informado (e houver ocorrências), o toque abre a lista de contratos
   /// já filtrada por essa situação.
   final SituacaoVigencia? situacaoContratos;
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
+    final cores = tema.colorScheme;
     final ativo = valor > 0;
-    final linha = _linha(tema, ativo);
-    if (situacaoContratos == null || !ativo) return linha;
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => _abrirContratos(context, situacaoContratos),
-      child: linha,
-    );
-  }
+    final (fundo, frente) = !ativo
+        ? (cores.surfaceContainerHighest, cores.onSurfaceVariant)
+        : gravidade == _Gravidade.erro
+        ? (cores.errorContainer, cores.onErrorContainer)
+        : (cores.tertiaryContainer, cores.onTertiaryContainer);
+    final tocavel = ativo && situacaoContratos != null;
 
-  Widget _linha(ThemeData tema, bool ativo) {
-    final cor = ativo ? tema.colorScheme.error : tema.colorScheme.outline;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(icone, color: cor, size: 22),
-          const SizedBox(width: 12),
-          Expanded(child: Text(rotulo, style: tema.textTheme.bodyMedium)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            decoration: BoxDecoration(
-              color: ativo
-                  ? tema.colorScheme.errorContainer
-                  : tema.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: tocavel ? () => _abrirContratos(context, situacaoContratos) : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: fundo,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icone, size: 22, color: frente),
             ),
-            child: Text(
-              Fmt.inteiro(valor),
-              style: tema.textTheme.labelLarge?.copyWith(
-                color: ativo
-                    ? tema.colorScheme.onErrorContainer
-                    : tema.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    rotulo,
+                    style: tema.textTheme.bodyLarge?.copyWith(
+                      fontWeight: ativo ? FontWeight.w600 : null,
+                    ),
+                  ),
+                  Text(
+                    ativo ? (detalhe ?? 'Requer atenção') : 'Nenhum',
+                    style: tema.textTheme.bodySmall?.copyWith(
+                      color: cores.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              Fmt.inteiro(valor),
+              style: tema.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: ativo
+                    ? (gravidade == _Gravidade.erro
+                          ? cores.error
+                          : cores.onSurface)
+                    : cores.onSurfaceVariant,
+              ),
+            ),
+            SizedBox(
+              width: 28,
+              child: tocavel
+                  ? Icon(Icons.chevron_right, color: cores.outline)
+                  : null,
+            ),
+          ],
+        ),
       ),
     );
   }

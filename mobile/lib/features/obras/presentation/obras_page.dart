@@ -15,7 +15,10 @@ import 'obra_detalhe_page.dart';
 /// Paginação por botão "Carregar mais" (mais simples e estável que scroll
 /// infinito).
 class ObrasPage extends ConsumerStatefulWidget {
-  const ObrasPage({super.key});
+  const ObrasPage({super.key, this.statusInicial});
+
+  /// Filtro de status já aplicado ao abrir (ex.: atalho do Dashboard).
+  final int? statusInicial;
 
   @override
   ConsumerState<ObrasPage> createState() => _ObrasPageState();
@@ -39,10 +42,20 @@ class _ObrasPageState extends ConsumerState<ObrasPage> {
   /// Descarta respostas antigas quando a busca/filtro muda no meio do caminho.
   int _requisicao = 0;
 
+  /// Chip do filtro inicial, para rolá-lo até ficar visível.
+  final _chipInicial = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    _statusId = widget.statusInicial;
     _recarregar();
+    if (_statusId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final chip = _chipInicial.currentContext;
+        if (chip != null) Scrollable.ensureVisible(chip, alignment: 0.5);
+      });
+    }
   }
 
   @override
@@ -151,12 +164,15 @@ class _ObrasPageState extends ConsumerState<ObrasPage> {
                       icon: const Icon(Icons.clear),
                       onPressed: _limparBusca,
                     ),
-              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
         ),
-        _FiltroStatus(selecionado: _statusId, onSelecionar: _filtrarStatus),
+        _FiltroStatus(
+          selecionado: _statusId,
+          onSelecionar: _filtrarStatus,
+          chaveInicial: widget.statusInicial == null ? null : _chipInicial,
+        ),
         Expanded(child: _conteudo()),
       ],
     );
@@ -177,7 +193,8 @@ class _ObrasPageState extends ConsumerState<ObrasPage> {
                 SizedBox(height: 80),
                 EmptyView(
                   mensagem: 'Nenhuma obra encontrada.',
-                  icone: Icons.search_off,
+                  icone: Icons.apartment_outlined,
+                  detalhe: 'Tente outra busca ou outro filtro de status.',
                 ),
               ],
             )
@@ -257,10 +274,17 @@ class _Contador extends StatelessWidget {
 /// Chips de status. Usa a lista de status do dashboard (id, nome, cor),
 /// sem precisar de endpoint novo. Se o dashboard não carregou, some.
 class _FiltroStatus extends ConsumerWidget {
-  const _FiltroStatus({required this.selecionado, required this.onSelecionar});
+  const _FiltroStatus({
+    required this.selecionado,
+    required this.onSelecionar,
+    this.chaveInicial,
+  });
 
   final int? selecionado;
   final ValueChanged<int?> onSelecionar;
+
+  /// Chave do chip do filtro inicial (abertura a partir do Dashboard).
+  final GlobalKey? chaveInicial;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -283,6 +307,7 @@ class _FiltroStatus extends ConsumerWidget {
           ),
           for (final s in status)
             Padding(
+              key: s.id == selecionado ? chaveInicial : null,
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
                 label: Text('${s.nome} (${s.total})'),
@@ -314,22 +339,53 @@ class _ObraCard extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1 — Descrição
               Text(
                 obra.descricao,
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: tema.textTheme.titleSmall,
+                style: tema.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 10),
+              // 2 — Status · 3 — Percentual executado
+              Row(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: obra.status == null
+                          ? const SizedBox.shrink()
+                          : StatusChip(
+                              nome: obra.status!.nome,
+                              cor: obra.status!.cor,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    Fmt.percentual(obra.percentualExecutado),
+                    style: tema.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: tema.colorScheme.primary,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
-              if (obra.status != null)
-                StatusChip(nome: obra.status!.nome, cor: obra.status!.cor),
-              const SizedBox(height: 10),
-              BarraPercentual(percentual: obra.percentualExecutado, altura: 8),
-              const SizedBox(height: 8),
+              BarraPercentual(
+                percentual: obra.percentualExecutado,
+                altura: 8,
+                mostrarTexto: false,
+              ),
+              const SizedBox(height: 12),
+              // 4 — Contratado · 5 — Medido
               Row(
                 children: [
                   Expanded(
@@ -347,6 +403,15 @@ class _ObraCard extends StatelessWidget {
                   ),
                 ],
               ),
+              // Secundário
+              if (obra.endereco != null) ...[
+                const SizedBox(height: 8),
+                LinhaIcone(
+                  icone: Icons.place_outlined,
+                  texto: obra.endereco!,
+                  maxLinhas: 1,
+                ),
+              ],
             ],
           ),
         ),
@@ -372,10 +437,20 @@ class _Valor extends StatelessWidget {
     return Column(
       crossAxisAlignment: alinhamento,
       children: [
-        Text(rotulo, style: tema.textTheme.bodySmall),
+        Text(
+          rotulo,
+          style: tema.textTheme.bodySmall?.copyWith(
+            color: tema.colorScheme.onSurfaceVariant,
+          ),
+        ),
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(valor, style: tema.textTheme.titleSmall),
+          child: Text(
+            valor,
+            style: tema.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );

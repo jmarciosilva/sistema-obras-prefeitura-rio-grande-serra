@@ -154,7 +154,6 @@ class _ContratosPageState extends ConsumerState<ContratosPage> {
                       icon: const Icon(Icons.clear),
                       onPressed: _limparBusca,
                     ),
-              border: const OutlineInputBorder(),
               isDense: true,
             ),
           ),
@@ -180,7 +179,8 @@ class _ContratosPageState extends ConsumerState<ContratosPage> {
                 SizedBox(height: 80),
                 EmptyView(
                   mensagem: 'Nenhum contrato encontrado.',
-                  icone: Icons.search_off,
+                  icone: Icons.receipt_long_outlined,
+                  detalhe: 'Tente outra busca ou outro filtro de situação.',
                 ),
               ],
             )
@@ -314,48 +314,53 @@ class _ContratoCard extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1 — Número · 2 — Situação
               Row(
                 children: [
                   Expanded(
-                    child: Text(c.titulo, style: tema.textTheme.titleSmall),
+                    child: Text(
+                      c.titulo,
+                      style: tema.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   SituacaoChip(situacao: c.situacao),
                 ],
               ),
+              // 3 — Empresa
               if (c.empresa != null) ...[
                 const SizedBox(height: 6),
                 Text(
                   c.empresa!.nomeExibicao,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: tema.textTheme.bodyMedium?.copyWith(
+                  style: tema.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
-              if (c.obra != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  c.obra!.descricao,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: tema.textTheme.bodySmall?.copyWith(
-                    color: tema.colorScheme.onSurfaceVariant,
-                  ),
+              // 4 — Obra
+              if (c.obra != null)
+                LinhaIcone(
+                  icone: Icons.apartment_outlined,
+                  texto: c.obra!.descricao,
+                  maxLinhas: 1,
                 ),
-              ],
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
+              // 5 — Percentual executado
               BarraPercentual(percentual: c.percentualExecutado, altura: 8),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
                     child: _Valor(
-                      rotulo: 'Contrato',
+                      rotulo: 'Contratado',
                       valor: Fmt.moeda(c.valorContrato),
                     ),
                   ),
@@ -368,20 +373,12 @@ class _ContratoCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Icon(
-                    Icons.event_outlined,
-                    size: 16,
-                    color: tema.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Vigência: ${Fmt.data(c.vigenciaContrato)}',
-                    style: tema.textTheme.bodySmall,
-                  ),
-                ],
+              const SizedBox(height: 4),
+              LinhaIcone(
+                icone: Icons.event_outlined,
+                texto: c.vigenciaContrato == null
+                    ? 'Vigência não informada'
+                    : 'Vigência até ${Fmt.data(c.vigenciaContrato)}',
               ),
             ],
           ),
@@ -408,10 +405,20 @@ class _Valor extends StatelessWidget {
     return Column(
       crossAxisAlignment: alinhamento,
       children: [
-        Text(rotulo, style: tema.textTheme.bodySmall),
+        Text(
+          rotulo,
+          style: tema.textTheme.bodySmall?.copyWith(
+            color: tema.colorScheme.onSurfaceVariant,
+          ),
+        ),
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(valor, style: tema.textTheme.titleSmall),
+          child: Text(
+            valor,
+            style: tema.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );

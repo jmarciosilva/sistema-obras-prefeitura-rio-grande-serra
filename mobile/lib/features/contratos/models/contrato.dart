@@ -5,7 +5,7 @@ import '../../obras/models/obra_detalhe.dart';
 /// Situação da vigência calculada pela API (`situacao_vigencia`).
 enum SituacaoVigencia {
   vigente('vigente', 'Vigente'),
-  venceEmBreve('vence_em_breve', 'Vence em breve'),
+  venceEmBreve('vence_em_breve', 'Vencendo'),
   vencido('vencido', 'Vencido'),
   semVigencia('sem_vigencia', 'Sem vigência');
 

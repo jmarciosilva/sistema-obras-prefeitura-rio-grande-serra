@@ -19,7 +19,7 @@ class ContratoDetalhePage extends ConsumerWidget {
     final detalhe = ref.watch(contratoDetalheProvider(id));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Detalhe do contrato')),
+      appBar: const InstitucionalAppBar(titulo: 'Detalhe do contrato'),
       body: detalhe.when(
         skipLoadingOnRefresh: !detalhe.hasError,
         loading: () => const LoadingView(),
@@ -54,27 +54,29 @@ class _Conteudo extends StatelessWidget {
     final c = detalhe.contrato;
 
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       children: [
-        // 1 — Identificação
+        // 1 — Contrato
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(c.titulo, style: tema.textTheme.titleMedium),
-                    ),
-                    SituacaoChip(situacao: c.situacao),
-                  ],
+                Text(
+                  c.titulo,
+                  style: tema.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                LinhaInfo(
-                  rotulo: 'Processo licitatório',
-                  valor: c.processoLicitacao ?? '—',
+                const SizedBox(height: 10),
+                SituacaoChip(situacao: c.situacao),
+                const SizedBox(height: 10),
+                LinhaIcone(
+                  icone: Icons.gavel_outlined,
+                  texto: c.processoLicitacao == null
+                      ? 'Processo licitatório não informado'
+                      : 'Processo licitatório ${c.processoLicitacao}',
                 ),
               ],
             ),
@@ -86,7 +88,10 @@ class _Conteudo extends StatelessWidget {
           titulo: 'Obra',
           icone: Icons.apartment_outlined,
           child: c.obra == null
-              ? const Text('Nenhuma obra vinculada.')
+              ? const VazioInline(
+                  texto: 'Nenhuma obra vinculada.',
+                  icone: Icons.apartment_outlined,
+                )
               : InkWell(
                   borderRadius: BorderRadius.circular(8),
                   onTap: () => Navigator.of(context).push(
@@ -102,7 +107,9 @@ class _Conteudo extends StatelessWidget {
                           children: [
                             Text(
                               c.obra!.descricao,
-                              style: tema.textTheme.bodyMedium,
+                              style: tema.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             if (c.obra!.status != null) ...[
                               const SizedBox(height: 8),
@@ -111,12 +118,11 @@ class _Conteudo extends StatelessWidget {
                                 cor: c.obra!.status!.cor,
                               ),
                             ],
-                            const SizedBox(height: 8),
-                            Text(
-                              c.obra!.endereco ?? 'Endereço não informado',
-                              style: tema.textTheme.bodySmall?.copyWith(
-                                color: tema.colorScheme.onSurfaceVariant,
-                              ),
+                            const SizedBox(height: 4),
+                            LinhaIcone(
+                              icone: Icons.place_outlined,
+                              texto:
+                                  c.obra!.endereco ?? 'Endereço não informado',
                             ),
                           ],
                         ),
@@ -132,10 +138,13 @@ class _Conteudo extends StatelessWidget {
 
         // 3 — Empresa
         SecaoCard(
-          titulo: 'Empresa contratada',
+          titulo: 'Empresa',
           icone: Icons.business_outlined,
           child: c.empresa == null
-              ? const Text('Empresa não informada.')
+              ? const VazioInline(
+                  texto: 'Empresa não informada.',
+                  icone: Icons.business_outlined,
+                )
               : Column(
                   children: [
                     LinhaInfo(
@@ -154,26 +163,11 @@ class _Conteudo extends StatelessWidget {
         SecaoCard(
           titulo: 'Execução financeira',
           icone: Icons.trending_up,
-          child: Column(
-            children: [
-              BarraPercentual(percentual: c.percentualExecutado, altura: 12),
-              const SizedBox(height: 12),
-              LinhaInfo(
-                rotulo: 'Valor contratado',
-                valor: Fmt.moeda(c.valorContrato),
-                destaque: true,
-              ),
-              LinhaInfo(
-                rotulo: 'Valor medido',
-                valor: Fmt.moeda(c.valorMedido),
-                destaque: true,
-              ),
-              LinhaInfo(
-                rotulo: 'Saldo',
-                valor: Fmt.moeda(c.saldo),
-                destaque: true,
-              ),
-            ],
+          child: ResumoFinanceiro(
+            percentual: c.percentualExecutado,
+            contratado: c.valorContrato,
+            medido: c.valorMedido,
+            saldo: c.saldo,
           ),
         ),
 
@@ -210,24 +204,19 @@ class _Conteudo extends StatelessWidget {
           titulo: 'Últimas medições',
           icone: Icons.straighten,
           child: detalhe.ultimasMedicoes.isEmpty
-              ? const Text('Nenhuma medição registrada.')
+              ? const VazioInline(
+                  texto: 'Nenhuma medição registrada.',
+                  icone: Icons.event_note_outlined,
+                )
               : Column(
                   children: [
-                    for (final m in detalhe.ultimasMedicoes)
-                      ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.event_note_outlined),
-                        title: Text(Fmt.data(m.dataMedicao)),
-                        trailing: Text(
-                          Fmt.moeda(m.valorMedido),
-                          style: tema.textTheme.titleSmall,
-                        ),
-                      ),
+                    for (final (i, m) in detalhe.ultimasMedicoes.indexed) ...[
+                      if (i > 0) const Divider(height: 1),
+                      LinhaMedicao(data: m.dataMedicao, valor: m.valorMedido),
+                    ],
                   ],
                 ),
         ),
-        const SizedBox(height: 12),
       ],
     );
   }
