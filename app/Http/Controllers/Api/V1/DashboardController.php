@@ -12,6 +12,7 @@ class DashboardController extends Controller
     {
         return response()->json([
             'obras'         => $dashboard->resumoObras(),
+            'contratos'     => $dashboard->resumoContratos(),
             'status'        => $dashboard->obrasPorStatus(),
             'alertas'       => $dashboard->alertas(),
             'atualizado_em' => now()->toIso8601String(),

@@ -42,6 +42,7 @@ class DashboardPage extends ConsumerWidget {
             const SizedBox(height: 4),
             _Financeiro(resumo: d.obras),
             _PorStatus(status: d.status, total: d.obras.total),
+            _ContratosCard(resumo: d.contratos),
             _AlertasCard(alertas: d.alertas),
             const SizedBox(height: 12),
           ],
@@ -292,6 +293,144 @@ class _PorStatus extends StatelessWidget {
   }
 }
 
+/// Abre a lista de Contratos (opcionalmente já filtrada), usada pela seção
+/// de Contratos e pelos alertas.
+void _abrirContratos(BuildContext context, SituacaoVigencia? situacao) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => Scaffold(
+        // Título genérico: o usuário pode trocar o filtro nesta tela
+        appBar: AppBar(title: const Text('Contratos')),
+        body: ContratosPage(situacaoInicial: situacao),
+      ),
+    ),
+  );
+}
+
+class _ContratosCard extends StatelessWidget {
+  const _ContratosCard({required this.resumo});
+
+  final ResumoContratos resumo;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return SecaoCard(
+      titulo: 'Contratos',
+      icone: Icons.description_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _KpiContrato(rotulo: 'Total', valor: resumo.total),
+              _KpiContrato(
+                rotulo: 'Vigentes',
+                valor: resumo.vigentes,
+                situacao: SituacaoVigencia.vigente,
+              ),
+              _KpiContrato(
+                rotulo: 'Vencendo',
+                valor: resumo.venceEmBreve,
+                situacao: SituacaoVigencia.venceEmBreve,
+                alerta: true,
+              ),
+              _KpiContrato(
+                rotulo: 'Vencidos',
+                valor: resumo.vencidos,
+                situacao: SituacaoVigencia.vencido,
+                alerta: true,
+              ),
+            ],
+          ),
+          if (resumo.semVigencia > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${Fmt.inteiro(resumo.semVigencia)} sem vigência informada',
+                style: tema.textTheme.bodySmall,
+              ),
+            ),
+          const Divider(height: 24),
+          Text(
+            'Execução financeira dos contratos',
+            style: tema.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          BarraPercentual(percentual: resumo.percentualExecutado),
+          const SizedBox(height: 8),
+          LinhaInfo(
+            rotulo: 'Valor contratado',
+            valor: Fmt.moeda(resumo.valorContratado),
+            destaque: true,
+          ),
+          LinhaInfo(
+            rotulo: 'Valor medido',
+            valor: Fmt.moeda(resumo.valorMedido),
+            destaque: true,
+          ),
+          LinhaInfo(
+            rotulo: 'Saldo',
+            valor: Fmt.moeda(resumo.saldo),
+            destaque: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Indicador tocável: abre Contratos filtrado por [situacao]
+/// (ou sem filtro, quando nulo).
+class _KpiContrato extends StatelessWidget {
+  const _KpiContrato({
+    required this.rotulo,
+    required this.valor,
+    this.situacao,
+    this.alerta = false,
+  });
+
+  final String rotulo;
+  final int valor;
+  final SituacaoVigencia? situacao;
+
+  /// Destaca em cor de erro quando houver contratos nessa situação.
+  final bool alerta;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    final cor = alerta && valor > 0
+        ? tema.colorScheme.error
+        : tema.colorScheme.primary;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => _abrirContratos(context, situacao),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+          child: Column(
+            children: [
+              Text(
+                Fmt.inteiro(valor),
+                style: tema.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: cor,
+                ),
+              ),
+              Text(
+                rotulo,
+                textAlign: TextAlign.center,
+                style: tema.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AlertasCard extends StatelessWidget {
   const _AlertasCard({required this.alertas});
 
@@ -341,18 +480,6 @@ class _LinhaAlerta extends StatelessWidget {
   /// já filtrada por essa situação.
   final SituacaoVigencia? situacaoContratos;
 
-  void _abrirContratos(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          // Título genérico: o usuário pode trocar o filtro nesta tela
-          appBar: AppBar(title: const Text('Contratos')),
-          body: ContratosPage(situacaoInicial: situacaoContratos),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
@@ -361,7 +488,7 @@ class _LinhaAlerta extends StatelessWidget {
     if (situacaoContratos == null || !ativo) return linha;
     return InkWell(
       borderRadius: BorderRadius.circular(8),
-      onTap: () => _abrirContratos(context),
+      onTap: () => _abrirContratos(context, situacaoContratos),
       child: linha,
     );
   }

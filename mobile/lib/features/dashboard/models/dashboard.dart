@@ -1,23 +1,27 @@
 import '../../../shared/utils/json.dart';
 
 /// Contrato de `GET /dashboard`:
-/// { "obras": {...}, "status": [...], "alertas": {...},
+/// { "obras": {...}, "contratos": {...}, "status": [...], "alertas": {...},
 ///   "atualizado_em": "2026-09-21T20:18:08+00:00" }
 class Dashboard {
   const Dashboard({
     required this.obras,
+    required this.contratos,
     required this.status,
     required this.alertas,
     this.atualizadoEm,
   });
 
   final ResumoObras obras;
+  final ResumoContratos contratos;
   final List<StatusQuantidade> status;
   final Alertas alertas;
   final DateTime? atualizadoEm;
 
   factory Dashboard.fromJson(Map<String, dynamic> json) => Dashboard(
     obras: ResumoObras.fromJson(asMap(json['obras']) ?? const {}),
+    // Tolerante: API anterior não enviava "contratos" → tudo zero.
+    contratos: ResumoContratos.fromJson(asMap(json['contratos']) ?? const {}),
     status: asMapList(json['status']).map(StatusQuantidade.fromJson).toList(),
     alertas: Alertas.fromJson(asMap(json['alertas']) ?? const {}),
     atualizadoEm: asDate(json['atualizado_em']),
@@ -52,6 +56,45 @@ class ResumoObras {
     saldo: asDouble(json['saldo']),
     percentualExecutado: asDouble(json['percentual_executado']),
   );
+}
+
+/// "contratos": situações de vigência (mesmas regras da lista de Contratos)
+/// e execução financeira consolidada.
+class ResumoContratos {
+  const ResumoContratos({
+    required this.total,
+    required this.vigentes,
+    required this.venceEmBreve,
+    required this.vencidos,
+    required this.semVigencia,
+    required this.valorContratado,
+    required this.valorMedido,
+    required this.saldo,
+    required this.percentualExecutado,
+  });
+
+  final int total;
+  final int vigentes;
+  final int venceEmBreve;
+  final int vencidos;
+  final int semVigencia;
+  final double valorContratado;
+  final double valorMedido;
+  final double saldo;
+  final double percentualExecutado;
+
+  factory ResumoContratos.fromJson(Map<String, dynamic> json) =>
+      ResumoContratos(
+        total: asInt(json['total']),
+        vigentes: asInt(json['vigentes']),
+        venceEmBreve: asInt(json['vence_em_breve']),
+        vencidos: asInt(json['vencidos']),
+        semVigencia: asInt(json['sem_vigencia']),
+        valorContratado: asDouble(json['valor_contratado']),
+        valorMedido: asDouble(json['valor_medido']),
+        saldo: asDouble(json['saldo']),
+        percentualExecutado: asDouble(json['percentual_executado']),
+      );
 }
 
 /// Item de "status": { "id": 3, "nome": "Em Execução", "cor": "#0d6efd", "total": 10 }

@@ -47,6 +47,17 @@ void main() {
           'saldo': 43810264.76,
           'percentual_executado': 19.15,
         },
+        'contratos': {
+          'total': 30,
+          'vigentes': 15,
+          'vence_em_breve': 2,
+          'vencidos': 9,
+          'sem_vigencia': 4,
+          'valor_contratado': 54187185.56,
+          'valor_medido': 10376920.8,
+          'saldo': 43810264.76,
+          'percentual_executado': 19.15,
+        },
         'status': [
           {'id': 1, 'nome': 'Em Planejamento', 'cor': '#6c757d', 'total': 5},
           {'id': 3, 'nome': 'Em Execução', 'cor': '#0d6efd', 'total': 10},
@@ -63,6 +74,15 @@ void main() {
       expect(d.obras.emExecucao, 10);
       expect(d.obras.valorContratado, 54187185.56);
       expect(d.obras.percentualExecutado, 19.15);
+      expect(d.contratos.total, 30);
+      expect(d.contratos.vigentes, 15);
+      expect(d.contratos.venceEmBreve, 2);
+      expect(d.contratos.vencidos, 9);
+      expect(d.contratos.semVigencia, 4);
+      expect(d.contratos.valorContratado, 54187185.56);
+      expect(d.contratos.valorMedido, 10376920.8);
+      expect(d.contratos.saldo, 43810264.76);
+      expect(d.contratos.percentualExecutado, 19.15);
       expect(d.status, hasLength(2));
       expect(d.status[1].nome, 'Em Execução');
       expect(d.status[1].total, 10);
@@ -83,6 +103,39 @@ void main() {
       expect(d.status, isEmpty);
       expect(d.alertas.total, 0);
       expect(d.atualizadoEm, isNull);
+    });
+
+    test('"contratos" ausente (API anterior) vira resumo zerado', () {
+      final d = Dashboard.fromJson({
+        'obras': {'total': 3},
+      });
+
+      expect(d.obras.total, 3);
+      expect(d.contratos.total, 0);
+      expect(d.contratos.vencidos, 0);
+      expect(d.contratos.valorContratado, 0.0);
+      expect(d.contratos.percentualExecutado, 0.0);
+    });
+
+    test('contratos com inteiros, nulos e percentual limitado', () {
+      final d = Dashboard.fromJson({
+        'contratos': {
+          'total': 1,
+          'vigentes': null,
+          'valor_contratado': 100,
+          'valor_medido': 150,
+          'saldo': 0,
+          'percentual_executado': 100,
+        },
+      });
+
+      expect(d.contratos.total, 1);
+      expect(d.contratos.vigentes, 0);
+      expect(d.contratos.venceEmBreve, 0);
+      expect(d.contratos.valorContratado, 100.0);
+      expect(d.contratos.valorMedido, 150.0);
+      expect(d.contratos.saldo, 0.0);
+      expect(d.contratos.percentualExecutado, 100.0);
     });
   });
 

@@ -185,6 +185,93 @@ class MobileApiTest extends TestCase
             ->assertJsonPath('alertas.obras_sem_medicao', 1);
     }
 
+    /** Contrato avulso para os cenários de resumo de contratos. */
+    private function contratoComMedicoes(Obra $obra, Empresa $empresa, ?string $vigencia, float $valor, array $medicoes = []): Contrato
+    {
+        $contrato = Contrato::create([
+            'obra_id'             => $obra->id,
+            'empresa_id'          => $empresa->id,
+            'numero_contrato_ano' => '0' . random_int(10, 99) . '/2026',
+            'vigencia_contrato'   => $vigencia,
+            'valor_contrato'      => $valor,
+        ]);
+
+        foreach ($medicoes as $valorMedido) {
+            ExecucaoObra::create([
+                'contrato_id'  => $contrato->id,
+                'data_medicao' => now()->subDays(5)->toDateString(),
+                'valor_medido' => $valorMedido,
+            ]);
+        }
+
+        return $contrato;
+    }
+
+    public function test_dashboard_retorna_resumo_de_contratos(): void
+    {
+        $status  = StatusObra::create(['nome' => 'Em Execução', 'cor' => '#0d6efd', 'ordem' => 1]);
+        $obra    = Obra::create(['descricao' => 'Obra X', 'endereco' => 'Rua X', 'status_obra_id' => $status->id]);
+        $empresa = Empresa::create(['razao_social' => 'Construtora X LTDA', 'cnpj' => '22.222.222/0001-22']);
+
+        $this->contratoComMedicoes($obra, $empresa, now()->addDays(200)->toDateString(), 1000, [200, 100]); // vigente
+        $this->contratoComMedicoes($obra, $empresa, now()->addDays(10)->toDateString(), 500, [100]);        // vence em breve
+        $this->contratoComMedicoes($obra, $empresa, now()->subDays(10)->toDateString(), 500);               // vencido
+        $this->contratoComMedicoes($obra, $empresa, null, 0, [50]);                                         // sem vigência e sem valor
+        Sanctum::actingAs($this->secretario());
+
+        // contratado 2.000; medido 450 (inclui a medição do contrato sem valor)
+        $this->getJson('/api/v1/dashboard')
+            ->assertOk()
+            ->assertJsonPath('contratos.total', 4)
+            ->assertJsonPath('contratos.vigentes', 1)
+            ->assertJsonPath('contratos.vence_em_breve', 1)
+            ->assertJsonPath('contratos.vencidos', 1)
+            ->assertJsonPath('contratos.sem_vigencia', 1)
+            ->assertJsonPath('contratos.valor_contratado', 2000)
+            ->assertJsonPath('contratos.valor_medido', 450)
+            ->assertJsonPath('contratos.saldo', 1550)
+            ->assertJsonPath('contratos.percentual_executado', 22.5)
+            // Mesmas regras dos alertas e dos totais de obras
+            ->assertJsonPath('alertas.contratos_vencidos', 1)
+            ->assertJsonPath('alertas.contratos_vencendo', 1)
+            ->assertJsonPath('obras.valor_contratado', 2000)
+            ->assertJsonPath('obras.valor_medido', 450);
+    }
+
+    public function test_dashboard_contratos_percentual_limitado_a_100_e_saldo_nao_negativo(): void
+    {
+        $status  = StatusObra::create(['nome' => 'Em Execução', 'cor' => '#0d6efd', 'ordem' => 1]);
+        $obra    = Obra::create(['descricao' => 'Obra Y', 'endereco' => 'Rua Y', 'status_obra_id' => $status->id]);
+        $empresa = Empresa::create(['razao_social' => 'Construtora Y LTDA', 'cnpj' => '33.333.333/0001-33']);
+
+        $this->contratoComMedicoes($obra, $empresa, now()->addDays(200)->toDateString(), 100, [80, 70]);
+        Sanctum::actingAs($this->secretario());
+
+        $this->getJson('/api/v1/dashboard')
+            ->assertOk()
+            ->assertJsonPath('contratos.valor_contratado', 100)
+            ->assertJsonPath('contratos.valor_medido', 150)
+            ->assertJsonPath('contratos.saldo', 0)
+            ->assertJsonPath('contratos.percentual_executado', 100);
+    }
+
+    public function test_dashboard_sem_contratos_retorna_resumo_zerado(): void
+    {
+        Sanctum::actingAs($this->secretario());
+
+        $this->getJson('/api/v1/dashboard')
+            ->assertOk()
+            ->assertJsonPath('contratos.total', 0)
+            ->assertJsonPath('contratos.vigentes', 0)
+            ->assertJsonPath('contratos.vence_em_breve', 0)
+            ->assertJsonPath('contratos.vencidos', 0)
+            ->assertJsonPath('contratos.sem_vigencia', 0)
+            ->assertJsonPath('contratos.valor_contratado', 0)
+            ->assertJsonPath('contratos.valor_medido', 0)
+            ->assertJsonPath('contratos.saldo', 0)
+            ->assertJsonPath('contratos.percentual_executado', 0);
+    }
+
     public function test_listagem_de_obras_paginada_com_filtros(): void
     {
         $obra = $this->obraComMedicoes();

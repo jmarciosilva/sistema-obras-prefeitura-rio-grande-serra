@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Resources\Api\V1\ContratoResource;
 use App\Models\Contrato;
 use App\Models\ExecucaoObra;
 use App\Models\Obra;
@@ -25,13 +26,48 @@ class DashboardObrasService
 
     public function resumoObras(): array
     {
+        return [
+            'total'       => Obra::count(),
+            'em_execucao' => Obra::whereHas('status', fn($q) => $q->where('nome', 'like', '%Execu%'))->count(),
+            'concluidas'  => Obra::whereHas('status', fn($q) => $q->where('nome', 'like', '%Conclu%'))->count(),
+            ...$this->financeiroGeral(),
+        ];
+    }
+
+    /**
+     * Visão executiva de contratos.
+     *
+     * Situações: mesma regra da feature Contratos (ContratoResource::situacaoVigencia()),
+     * então a soma das quatro situações é sempre igual ao total.
+     * Financeiro: mesmas somas globais de resumoObras() — todas as medições
+     * pertencem a um contrato (contrato_id obrigatório), logo os totais coincidem.
+     */
+    public function resumoContratos(): array
+    {
+        $porSituacao = Contrato::query()
+            ->get(['id', 'vigencia_contrato'])
+            ->countBy(fn(Contrato $c) => ContratoResource::situacaoVigencia($c));
+
+        return [
+            'total'          => $porSituacao->sum(),
+            'vigentes'       => $porSituacao->get(ContratoResource::SITUACAO_VIGENTE, 0),
+            'vence_em_breve' => $porSituacao->get(ContratoResource::SITUACAO_VENCE_EM_BREVE, 0),
+            'vencidos'       => $porSituacao->get(ContratoResource::SITUACAO_VENCIDO, 0),
+            'sem_vigencia'   => $porSituacao->get(ContratoResource::SITUACAO_SEM_VIGENCIA, 0),
+            ...$this->financeiroGeral(),
+        ];
+    }
+
+    /**
+     * Somas globais (todas as medições), mesma regra do dashboard web:
+     * saldo nunca negativo; percentual limitado a 100.
+     */
+    private function financeiroGeral(): array
+    {
         $valorContratado = (float) Contrato::sum('valor_contrato');
         $valorMedido     = (float) ExecucaoObra::sum('valor_medido');
 
         return [
-            'total'                => Obra::count(),
-            'em_execucao'          => Obra::whereHas('status', fn($q) => $q->where('nome', 'like', '%Execu%'))->count(),
-            'concluidas'           => Obra::whereHas('status', fn($q) => $q->where('nome', 'like', '%Conclu%'))->count(),
             'valor_contratado'     => round($valorContratado, 2),
             'valor_medido'         => round($valorMedido, 2),
             'saldo'                => round(max($valorContratado - $valorMedido, 0), 2),
