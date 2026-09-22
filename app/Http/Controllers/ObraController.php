@@ -9,7 +9,10 @@ use App\Models\DemandaProposta;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use App\Models\Auditoria;
+use App\Services\AuditoriaService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class ObraController extends Controller
@@ -59,7 +62,7 @@ class ObraController extends Controller
 
         try {
             DB::beginTransaction();
-            $obra->convenios()->sync($request->input('convenios', []));
+            $this->sincronizarConvenios($obra, $request->input('convenios', []));
             DB::commit();
 
             return redirect()
@@ -107,7 +110,7 @@ class ObraController extends Controller
             $obra = Obra::create($dados);
 
             if ($convenios) {
-                $obra->convenios()->sync($convenios);
+                $this->sincronizarConvenios($obra, $convenios);
             }
 
             DB::commit();
@@ -163,7 +166,7 @@ class ObraController extends Controller
             unset($dados['convenios']);
 
             $obra->update($dados);
-            $obra->convenios()->sync($convenios);
+            $this->sincronizarConvenios($obra, $convenios);
 
             DB::commit();
 
@@ -283,8 +286,8 @@ class ObraController extends Controller
         try {
             DB::beginTransaction();
 
-            // Desvincula convênios (pivot) antes de deletar
-            $obra->convenios()->detach();
+            // Desvincula convênios (pivot) antes de deletar — com auditoria
+            $this->sincronizarConvenios($obra, []);
             $obra->delete();
 
             DB::commit();
@@ -298,5 +301,30 @@ class ObraController extends Controller
 
             return back()->withErrors(['geral' => 'Não foi possível excluir a obra. Verifique se há dados vinculados.']);
         }
+    }
+
+    /**
+     * Sincroniza os convênios da obra e registra a mudança na auditoria.
+     * O sync() da pivot não dispara o Observer da Obra; a auditoria só é
+     * gravada após o commit da transação em andamento.
+     */
+    private function sincronizarConvenios(Obra $obra, array $convenios): void
+    {
+        $antes     = $obra->convenios()->pluck('convenios.id')->map(fn($id) => (int) $id)->sort()->values()->all();
+        $resultado = $obra->convenios()->sync($convenios);
+
+        if ($resultado['attached'] === [] && $resultado['detached'] === []) {
+            return;
+        }
+
+        $depois = collect($convenios)->map(fn($id) => (int) $id)->unique()->sort()->values()->all();
+
+        app(AuditoriaService::class)->registrar(
+            Auditoria::ALTEROU,
+            $obra,
+            ['convenios' => $antes],
+            ['convenios' => $depois],
+            'Convênios da obra atualizados: ' . Str::limit((string) $obra->descricao, 80),
+        );
     }
 }

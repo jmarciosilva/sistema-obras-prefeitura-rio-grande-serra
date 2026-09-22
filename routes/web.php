@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\DemandaPropostaController;
 use App\Http\Controllers\Admin\ResponsavelTecnicoController;
 use App\Http\Controllers\RelatorioController;
 use App\Http\Controllers\RelatorioProcessoController;
+use App\Http\Controllers\AuditoriaController;
 
 // ───────────────────────────────────────────────────────────────
 // 🔐 ROTAS DE AUTENTICAÇÃO (Laravel Breeze)
@@ -240,6 +241,14 @@ Route::middleware(['auth'])->group(function () {
         Route::middleware('perfil:admin')->group(function () {
             Route::delete('/{contrato}/excluir', [ContratoController::class, 'destroy'])->name('destroy');
         });
+    });
+
+    // ───────────────────────────────────────────────────────────
+    // 🕓 HISTÓRICO DE ATIVIDADES (AUDITORIA) — somente leitura
+    // ───────────────────────────────────────────────────────────
+    Route::prefix('auditoria')->name('auditoria.')->middleware('perfil:admin,secretario')->group(function () {
+        Route::get('/', [AuditoriaController::class, 'index'])->name('index');
+        Route::get('/{auditoria}', [AuditoriaController::class, 'show'])->whereNumber('auditoria')->name('show');
     });
 
     // ───────────────────────────────────────────────────────────

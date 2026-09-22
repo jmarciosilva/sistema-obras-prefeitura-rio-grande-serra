@@ -212,6 +212,18 @@ Ainda não implementado da Fase 7.5: tempo médio de tramitação e processos co
 
 ---
 
+## 🕓 Auditoria — Histórico de Atividades *(implementada localmente)*
+
+Registra no sistema web **quem criou, alterou ou excluiu** registros de **Obras**, **Contratos** e **Medições** — inclusive os vínculos de **convênios** de cada obra (alterados via pivot, auditados no `ObraController`).
+
+- **O que é gravado:** usuário, data/hora, ação (criou / alterou / excluiu), módulo, registro afetado, **valores anteriores e posteriores** (na alteração, apenas os campos que mudaram; na exclusão, o snapshot completo), IP e navegador. Campos técnicos (`id`, `created_at`, `updated_at`) e sensíveis (senhas, tokens) nunca são gravados.
+- **Como funciona:** Observers (`app/Observers/`) + `App\Services\AuditoriaService`. A gravação acontece **após o commit** da transação — operação desfeita não gera histórico — e uma falha na auditoria só vai para o log, sem interromper a operação.
+- **Exclusões em cascata:** ao excluir uma obra/contrato, o MySQL apaga contratos/medições vinculados sem eventos do Eloquent; a descrição do histórico informa quantos foram removidos junto.
+- **Tela:** menu **Histórico de Atividades** (`/auditoria`), somente leitura, com filtros por usuário, período, módulo e ação, e detalhe "Campo | Antes | Depois" com nomes legíveis (status, empresa, obra, contrato, convênios).
+- **Acesso:** apenas **Administrador** e **Secretário** (middleware `perfil:admin,secretario` + Gate `ver-auditoria`); técnico e operador recebem 403 mesmo digitando a URL.
+- **Banco:** uma única tabela nova, `auditorias` — mudança aditiva, nenhuma tabela existente alterada. Em produção: `php artisan migrate --force`. O histórico é mantido indefinidamente (sem limpeza automática).
+- **App executivo:** o histórico **não** aparece no aplicativo mobile, que continua somente consulta.
+
 ## 📱 FASE 8 — Aplicativo Mobile Executivo
 
 App Flutter **somente leitura** para Prefeito e Secretário de Obras. O Laravel continua sendo a única fonte da verdade: o app apenas consome a API, sem regra de negócio própria.

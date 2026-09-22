@@ -93,6 +93,15 @@
 
                 <div class="border-t border-slate-700/60 my-3"></div>
 
+                {{-- Histórico de Atividades (auditoria): Administrador e Secretário --}}
+                @can('ver-auditoria')
+                    <a href="{{ route('auditoria.index') }}"
+                        class="flex items-center gap-3 px-3 py-2 rounded-md
+                    {{ request()->routeIs('auditoria.*') ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white' }}">
+                        🕓 <span x-show="sidebarOpen">Histórico de Atividades</span>
+                    </a>
+                @endcan
+
                 {{-- Admin (submenu recolhível) --}}
                 @auth
                     @if (auth()->user()->perfil === 'admin')
