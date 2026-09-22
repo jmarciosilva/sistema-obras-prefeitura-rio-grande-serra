@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/cache/consulta_offline.dart';
 
 /// Mensagem amigável para qualquer erro (nunca mostra detalhes técnicos).
-String mensagemDeErro(Object erro) =>
-    erro is ApiException ? erro.message : 'Erro ao carregar dados.';
+String mensagemDeErro(Object erro) => switch (erro) {
+  ApiException() => erro.message,
+  SemDadosOffline() => SemDadosOffline.mensagem,
+  _ => 'Erro ao carregar dados.',
+};
 
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key, this.mensagem = 'Carregando...'});
@@ -32,12 +36,16 @@ class ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final semDados = erro is SemDadosOffline;
     final semConexao =
-        erro is ApiException &&
-        (erro as ApiException).type == ApiErrorType.network;
+        semDados ||
+        (erro is ApiException &&
+            (erro as ApiException).type == ApiErrorType.network);
 
     return _Centro(
-      icone: semConexao ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
+      icone: semDados
+          ? Icons.cloud_off_outlined
+          : (semConexao ? Icons.wifi_off_rounded : Icons.error_outline_rounded),
       titulo: semConexao
           ? 'Sem conexão'
           : 'Não foi possível carregar os dados.',

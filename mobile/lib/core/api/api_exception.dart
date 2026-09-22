@@ -22,6 +22,12 @@ class ApiException implements Exception {
 
   static const _semConexao = 'Não foi possível conectar ao servidor.';
 
+  /// O servidor não pôde ser alcançado (sem conexão, timeout, DNS...) ou
+  /// está fora do ar (5xx). Nesses casos o app usa os dados locais.
+  /// Nunca inclui 401: token rejeitado sempre encerra a sessão.
+  bool get servidorInacessivel =>
+      type == ApiErrorType.network || type == ApiErrorType.server;
+
   factory ApiException.fromDio(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:

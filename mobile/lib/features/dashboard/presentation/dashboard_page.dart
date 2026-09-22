@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/widgets/aviso_offline.dart';
 import '../../../shared/widgets/componentes.dart';
 import '../../../shared/widgets/estados.dart';
 import '../../contratos/models/contrato.dart';
@@ -11,7 +12,9 @@ import '../data/dashboard_api.dart';
 import '../models/dashboard.dart';
 
 /// Painel Executivo: Resumo · Execução financeira · Obras · Contratos ·
-/// Pontos de atenção. Tudo vem de uma única chamada (`GET /dashboard`).
+/// Pontos de atenção. Tudo vem de uma única chamada (`GET /dashboard`),
+/// com cache local: abre na hora com o último dado salvo e atualiza em
+/// segundo plano.
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
 
@@ -26,39 +29,36 @@ class DashboardPage extends ConsumerWidget {
       loading: () => const LoadingView(),
       error: (e, _) =>
           ErrorView(erro: e, onRetry: () => ref.invalidate(dashboardProvider)),
-      data: (d) => RefreshIndicator(
+      data: (dados) => RefreshIndicator(
         onRefresh: () async {
-          try {
-            ref.invalidate(dashboardProvider);
-            await ref.read(dashboardProvider.future);
-          } catch (_) {
-            // O erro já aparece na tela via dashboardProvider.
-          }
+          final ok = await ref.read(dashboardProvider.notifier).atualizar();
+          if (!ok && context.mounted) avisarSemConexao(context);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
           children: [
-            _Cabecalho(atualizadoEm: d.atualizadoEm),
+            AvisoOffline(atualizadoEm: dados.atualizadoEm),
+            _Cabecalho(atualizadoEm: dados.valor.atualizadoEm),
             const TituloSecao('Resumo geral'),
-            _ResumoGeral(dashboard: d),
+            _ResumoGeral(dashboard: dados.valor),
             const TituloSecao('Execução financeira'),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: ResumoFinanceiro(
-                  percentual: d.obras.percentualExecutado,
-                  contratado: d.obras.valorContratado,
-                  medido: d.obras.valorMedido,
-                  saldo: d.obras.saldo,
+                  percentual: dados.valor.obras.percentualExecutado,
+                  contratado: dados.valor.obras.valorContratado,
+                  medido: dados.valor.obras.valorMedido,
+                  saldo: dados.valor.obras.saldo,
                 ),
               ),
             ),
             const TituloSecao('Obras'),
-            _ObrasCard(resumo: d.obras, status: d.status),
+            _ObrasCard(resumo: dados.valor.obras, status: dados.valor.status),
             const TituloSecao('Contratos'),
-            _ContratosCard(resumo: d.contratos),
+            _ContratosCard(resumo: dados.valor.contratos),
             const TituloSecao('Pontos de atenção'),
-            _PontosDeAtencao(alertas: d.alertas),
+            _PontosDeAtencao(alertas: dados.valor.alertas),
           ],
         ),
       ),

@@ -3,15 +3,19 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:obras_rgs/core/api/api_exception.dart';
+import 'package:obras_rgs/core/cache/cache_database.dart';
+import 'package:obras_rgs/core/cache/cache_repository.dart';
 import 'package:obras_rgs/core/storage/secure_storage.dart';
 import 'package:obras_rgs/features/auth/data/auth_api.dart';
 import 'package:obras_rgs/features/auth/models/login_response.dart';
 import 'package:obras_rgs/features/auth/models/user.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Armazenamento em memória (o flutter_secure_storage real exige plugin).
 class FakeSessionStorage implements SessionStorage {
   String? token;
   DateTime? expiresAt;
+  User? usuario;
 
   @override
   Future<String?> readToken() async => token;
@@ -26,10 +30,31 @@ class FakeSessionStorage implements SessionStorage {
   }
 
   @override
+  Future<User?> readUser() async => usuario;
+
+  @override
+  Future<void> saveUser(User user) async => usuario = user;
+
+  @override
   Future<void> clear() async {
     token = null;
     expiresAt = null;
+    usuario = null;
   }
+}
+
+/// Cache com SQLite REAL (via FFI, sem plugin), em memória e exclusivo do
+/// teste — valida o SQL de verdade (UNIQUE, filtros por usuário) sem criar
+/// arquivos.
+CacheRepository cacheDeTeste() {
+  sqfliteFfiInit();
+  return CacheRepository(
+    () => CacheDatabase.abrir(
+      factory: databaseFactoryFfi,
+      caminho: inMemoryDatabasePath,
+      unicaInstancia: false,
+    ),
+  );
 }
 
 const usuarioTeste = User(

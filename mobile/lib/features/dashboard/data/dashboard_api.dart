@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
-import '../../../core/auth/auth_state.dart';
+import '../../../core/cache/consulta_offline.dart';
 import '../../../core/providers.dart';
 import '../models/dashboard.dart';
 
@@ -10,18 +10,28 @@ class DashboardApi {
 
   final ApiClient _client;
 
-  Future<Dashboard> carregar() async =>
-      Dashboard.fromJson(await _client.get('/dashboard'));
+  /// JSON original (é ele que vai para o cache).
+  Future<Map<String, dynamic>> carregar() => _client.get('/dashboard');
 }
 
-/// Recarrega ao trocar de usuário e com `ref.invalidate(dashboardProvider)`.
-/// Também fornece a lista de status para o filtro da tela de Obras.
-final dashboardProvider = FutureProvider<Dashboard>((ref) {
-  final userId = ref.watch(
-    authProvider.select((s) => s is Authenticated ? s.user.id : null),
+final dashboardApiProvider = Provider<DashboardApi>(
+  (ref) => DashboardApi(ref.watch(apiClientProvider)),
+);
+
+/// Cache primeiro, revalida com a API em segundo plano.
+/// Recarrega ao trocar de usuário. Também fornece a lista de status para o
+/// filtro da tela de Obras.
+class DashboardNotifier extends ConsultaNotifier<Dashboard> {
+  @override
+  Swr<Dashboard> swr(ConsultaOffline consulta) => Swr(
+    consulta: consulta,
+    chave: 'dashboard',
+    api: ref.read(dashboardApiProvider).carregar,
+    converter: Dashboard.fromJson,
   );
-  if (userId == null) {
-    return Future.error(StateError('Sem sessão'));
-  }
-  return DashboardApi(ref.watch(apiClientProvider)).carregar();
-});
+}
+
+final dashboardProvider =
+    AsyncNotifierProvider<DashboardNotifier, Dados<Dashboard>>(
+      DashboardNotifier.new,
+    );

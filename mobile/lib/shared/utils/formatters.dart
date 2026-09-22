@@ -26,6 +26,21 @@ class Fmt {
   static String dataHora(DateTime? d) =>
       d == null ? '—' : _dataHora.format(d.toLocal());
 
+  /// "22/09/2026 às 08:42"
+  static String dataHoraExtenso(DateTime d) {
+    final local = d.toLocal();
+    return '${_data.format(local)} às ${DateFormat('HH:mm').format(local)}';
+  }
+
+  /// Tempo decorrido: "agora", "há 5 min", "há 2 h", "há 3 dias".
+  static String relativo(DateTime d, {DateTime? agora}) {
+    final dif = (agora ?? DateTime.now()).difference(d);
+    if (dif.inMinutes < 1) return 'agora';
+    if (dif.inMinutes < 60) return 'há ${dif.inMinutes} min';
+    if (dif.inHours < 24) return 'há ${dif.inHours} h';
+    return dif.inDays == 1 ? 'há 1 dia' : 'há ${dif.inDays} dias';
+  }
+
   /// Cor hexadecimal da API (#0d6efd) → Color. Cinza-azulado se inválida.
   static Color cor(String? hex) {
     final h = (hex ?? '').replaceAll('#', '');

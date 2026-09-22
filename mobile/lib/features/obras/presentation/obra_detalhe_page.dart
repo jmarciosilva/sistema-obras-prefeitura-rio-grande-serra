@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/cache/consulta_offline.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/widgets/aviso_offline.dart';
 import '../../../shared/widgets/componentes.dart';
 import '../../../shared/widgets/estados.dart';
 import '../../contratos/presentation/contrato_detalhe_page.dart';
@@ -27,16 +29,14 @@ class ObraDetalhePage extends ConsumerWidget {
           erro: e,
           onRetry: () => ref.invalidate(obraDetalheProvider(id)),
         ),
-        data: (d) => RefreshIndicator(
+        data: (dados) => RefreshIndicator(
           onRefresh: () async {
-            try {
-              ref.invalidate(obraDetalheProvider(id));
-              await ref.read(obraDetalheProvider(id).future);
-            } catch (_) {
-              // O erro já aparece na tela.
-            }
+            final ok = await ref
+                .read(obraDetalheProvider(id).notifier)
+                .atualizar();
+            if (!ok && context.mounted) avisarSemConexao(context);
           },
-          child: _Conteudo(detalhe: d),
+          child: _Conteudo(dados: dados),
         ),
       ),
     );
@@ -44,18 +44,21 @@ class ObraDetalhePage extends ConsumerWidget {
 }
 
 class _Conteudo extends StatelessWidget {
-  const _Conteudo({required this.detalhe});
+  const _Conteudo({required this.dados});
 
-  final ObraDetalhe detalhe;
+  final Dados<ObraDetalhe> dados;
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
+    final detalhe = dados.valor;
     final obra = detalhe.obra;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       children: [
+        AvisoOffline(atualizadoEm: dados.atualizadoEm),
+        if (dados.parcial) const AvisoDetalheParcial(),
         // 1 — Obra
         Card(
           child: Padding(
@@ -102,54 +105,57 @@ class _Conteudo extends StatelessWidget {
           ),
         ),
 
-        // 3 — Contratos vinculados
-        SecaoCard(
-          titulo: detalhe.contratos.length > 1
-              ? 'Contratos (${detalhe.contratos.length})'
-              : 'Contrato',
-          icone: Icons.receipt_long_outlined,
-          child: detalhe.contratos.isEmpty
-              ? const VazioInline(
-                  texto: 'Nenhum contrato cadastrado.',
-                  icone: Icons.receipt_long_outlined,
-                )
-              : Column(
-                  children: [
-                    for (final (i, c) in detalhe.contratos.indexed) ...[
-                      if (i > 0) const Divider(height: 16),
-                      _ContratoResumo(contrato: c),
+        // Resumo da lista: contratos e medições não são conhecidos
+        if (!dados.parcial) ...[
+          // 3 — Contratos vinculados
+          SecaoCard(
+            titulo: detalhe.contratos.length > 1
+                ? 'Contratos (${detalhe.contratos.length})'
+                : 'Contrato',
+            icone: Icons.receipt_long_outlined,
+            child: detalhe.contratos.isEmpty
+                ? const VazioInline(
+                    texto: 'Nenhum contrato cadastrado.',
+                    icone: Icons.receipt_long_outlined,
+                  )
+                : Column(
+                    children: [
+                      for (final (i, c) in detalhe.contratos.indexed) ...[
+                        if (i > 0) const Divider(height: 16),
+                        _ContratoResumo(contrato: c),
+                      ],
                     ],
-                  ],
-                ),
-        ),
+                  ),
+          ),
 
-        // 4 — Últimas medições
-        SecaoCard(
-          titulo: 'Últimas medições',
-          icone: Icons.straighten,
-          child: detalhe.ultimasMedicoes.isEmpty
-              ? const VazioInline(
-                  texto: 'Nenhuma medição registrada.',
-                  icone: Icons.event_note_outlined,
-                )
-              : Column(
-                  children: [
-                    for (final (i, m) in detalhe.ultimasMedicoes.indexed) ...[
-                      if (i > 0) const Divider(height: 1),
-                      LinhaMedicao(
-                        data: m.dataMedicao,
-                        valor: m.valorMedido,
-                        // Contrato só é útil quando a obra tem mais de um
-                        contexto:
-                            detalhe.contratos.length > 1 &&
-                                m.numeroContrato != null
-                            ? 'Contrato ${m.numeroContrato}'
-                            : null,
-                      ),
+          // 4 — Últimas medições
+          SecaoCard(
+            titulo: 'Últimas medições',
+            icone: Icons.straighten,
+            child: detalhe.ultimasMedicoes.isEmpty
+                ? const VazioInline(
+                    texto: 'Nenhuma medição registrada.',
+                    icone: Icons.event_note_outlined,
+                  )
+                : Column(
+                    children: [
+                      for (final (i, m) in detalhe.ultimasMedicoes.indexed) ...[
+                        if (i > 0) const Divider(height: 1),
+                        LinhaMedicao(
+                          data: m.dataMedicao,
+                          valor: m.valorMedido,
+                          // Contrato só é útil quando a obra tem mais de um
+                          contexto:
+                              detalhe.contratos.length > 1 &&
+                                  m.numeroContrato != null
+                              ? 'Contrato ${m.numeroContrato}'
+                              : null,
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-        ),
+                  ),
+          ),
+        ],
       ],
     );
   }

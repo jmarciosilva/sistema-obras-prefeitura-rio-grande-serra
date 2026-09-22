@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/cache/consulta_offline.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/widgets/aviso_offline.dart';
 import '../../../shared/widgets/componentes.dart';
 import '../../../shared/widgets/estados.dart';
 import '../../obras/presentation/obra_detalhe_page.dart';
@@ -27,16 +29,14 @@ class ContratoDetalhePage extends ConsumerWidget {
           erro: e,
           onRetry: () => ref.invalidate(contratoDetalheProvider(id)),
         ),
-        data: (d) => RefreshIndicator(
+        data: (dados) => RefreshIndicator(
           onRefresh: () async {
-            try {
-              ref.invalidate(contratoDetalheProvider(id));
-              await ref.read(contratoDetalheProvider(id).future);
-            } catch (_) {
-              // O erro já aparece na tela.
-            }
+            final ok = await ref
+                .read(contratoDetalheProvider(id).notifier)
+                .atualizar();
+            if (!ok && context.mounted) avisarSemConexao(context);
           },
-          child: _Conteudo(detalhe: d),
+          child: _Conteudo(dados: dados),
         ),
       ),
     );
@@ -44,18 +44,21 @@ class ContratoDetalhePage extends ConsumerWidget {
 }
 
 class _Conteudo extends StatelessWidget {
-  const _Conteudo({required this.detalhe});
+  const _Conteudo({required this.dados});
 
-  final ContratoDetalhe detalhe;
+  final Dados<ContratoDetalhe> dados;
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
+    final detalhe = dados.valor;
     final c = detalhe.contrato;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       children: [
+        AvisoOffline(atualizadoEm: dados.atualizadoEm),
+        if (dados.parcial) const AvisoDetalheParcial(),
         // 1 — Contrato
         Card(
           child: Padding(
@@ -118,12 +121,15 @@ class _Conteudo extends StatelessWidget {
                                 cor: c.obra!.status!.cor,
                               ),
                             ],
-                            const SizedBox(height: 4),
-                            LinhaIcone(
-                              icone: Icons.place_outlined,
-                              texto:
-                                  c.obra!.endereco ?? 'Endereço não informado',
-                            ),
+                            if (!dados.parcial || c.obra!.endereco != null) ...[
+                              const SizedBox(height: 4),
+                              LinhaIcone(
+                                icone: Icons.place_outlined,
+                                texto:
+                                    c.obra!.endereco ??
+                                    'Endereço não informado',
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -199,24 +205,25 @@ class _Conteudo extends StatelessWidget {
           ),
         ),
 
-        // 6 — Medições
-        SecaoCard(
-          titulo: 'Últimas medições',
-          icone: Icons.straighten,
-          child: detalhe.ultimasMedicoes.isEmpty
-              ? const VazioInline(
-                  texto: 'Nenhuma medição registrada.',
-                  icone: Icons.event_note_outlined,
-                )
-              : Column(
-                  children: [
-                    for (final (i, m) in detalhe.ultimasMedicoes.indexed) ...[
-                      if (i > 0) const Divider(height: 1),
-                      LinhaMedicao(data: m.dataMedicao, valor: m.valorMedido),
+        // 6 — Medições (desconhecidas no resumo da lista)
+        if (!dados.parcial)
+          SecaoCard(
+            titulo: 'Últimas medições',
+            icone: Icons.straighten,
+            child: detalhe.ultimasMedicoes.isEmpty
+                ? const VazioInline(
+                    texto: 'Nenhuma medição registrada.',
+                    icone: Icons.event_note_outlined,
+                  )
+                : Column(
+                    children: [
+                      for (final (i, m) in detalhe.ultimasMedicoes.indexed) ...[
+                        if (i > 0) const Divider(height: 1),
+                        LinhaMedicao(data: m.dataMedicao, valor: m.valorMedido),
+                      ],
                     ],
-                  ],
-                ),
-        ),
+                  ),
+          ),
       ],
     );
   }

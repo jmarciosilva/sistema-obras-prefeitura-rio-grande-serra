@@ -1,9 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/cache/sync_state.dart';
 import '../../../shared/utils/formatters.dart';
+import '../../../shared/utils/texto.dart';
+import '../../../shared/widgets/aviso_offline.dart';
 import '../../../shared/widgets/componentes.dart';
 import '../../../shared/widgets/estados.dart';
 import '../../dashboard/data/dashboard_api.dart';
@@ -11,9 +12,11 @@ import '../data/obras_api.dart';
 import '../models/obra.dart';
 import 'obra_detalhe_page.dart';
 
-/// Lista paginada de obras com busca (debounce) e filtro de status.
-/// Paginação por botão "Carregar mais" (mais simples e estável que scroll
-/// infinito).
+/// Lista de obras com busca e filtro de status.
+///
+/// Offline-first: a lista COMPLETA fica no cache do aparelho (sincronizada
+/// em segundo plano); busca e filtro são aplicados localmente, então
+/// funcionam igual com ou sem conexão.
 class ObrasPage extends ConsumerStatefulWidget {
   const ObrasPage({super.key, this.statusInicial});
 
@@ -26,21 +29,7 @@ class ObrasPage extends ConsumerStatefulWidget {
 
 class _ObrasPageState extends ConsumerState<ObrasPage> {
   final _busca = TextEditingController();
-  Timer? _debounce;
-
-  final List<Obra> _obras = [];
-  int _paginaAtual = 0;
-  bool _temMais = false;
-  int _total = 0;
   int? _statusId;
-
-  bool _carregando = false;
-  bool _carregandoMais = false;
-  Object? _erro;
-  Object? _erroMais;
-
-  /// Descarta respostas antigas quando a busca/filtro muda no meio do caminho.
-  int _requisicao = 0;
 
   /// Chip do filtro inicial, para rolá-lo até ficar visível.
   final _chipInicial = GlobalKey();
@@ -49,7 +38,6 @@ class _ObrasPageState extends ConsumerState<ObrasPage> {
   void initState() {
     super.initState();
     _statusId = widget.statusInicial;
-    _recarregar();
     if (_statusId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final chip = _chipInicial.currentContext;
@@ -60,88 +48,30 @@ class _ObrasPageState extends ConsumerState<ObrasPage> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _busca.dispose();
     super.dispose();
   }
 
-  Future<void> _recarregar() async {
-    final id = ++_requisicao;
-    setState(() {
-      _carregando = true;
-      _erro = null;
-      _erroMais = null;
-    });
-    try {
-      final pagina = await ref
-          .read(obrasApiProvider)
-          .listar(page: 1, search: _busca.text, statusId: _statusId);
-      if (!mounted || id != _requisicao) return;
-      setState(() {
-        _obras
-          ..clear()
-          ..addAll(pagina.obras);
-        _paginaAtual = pagina.currentPage;
-        _temMais = pagina.hasMore;
-        _total = pagina.total;
-      });
-    } catch (e) {
-      if (mounted && id == _requisicao) setState(() => _erro = e);
-    } finally {
-      if (mounted && id == _requisicao) setState(() => _carregando = false);
-    }
-  }
-
-  Future<void> _carregarMais() async {
-    final id = _requisicao;
-    setState(() {
-      _carregandoMais = true;
-      _erroMais = null;
-    });
-    try {
-      final pagina = await ref
-          .read(obrasApiProvider)
-          .listar(
-            page: _paginaAtual + 1,
-            search: _busca.text,
-            statusId: _statusId,
-          );
-      if (!mounted || id != _requisicao) return;
-      setState(() {
-        _obras.addAll(pagina.obras);
-        _paginaAtual = pagina.currentPage;
-        _temMais = pagina.hasMore;
-        _total = pagina.total;
-      });
-    } catch (e) {
-      if (mounted && id == _requisicao) setState(() => _erroMais = e);
-    } finally {
-      if (mounted) setState(() => _carregandoMais = false);
-    }
-  }
-
-  void _aoDigitar(String _) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 600), _recarregar);
-    setState(() {}); // mostra/oculta o botão de limpar
-  }
-
-  void _buscarAgora() {
-    _debounce?.cancel();
-    FocusScope.of(context).unfocus();
-    _recarregar();
-  }
-
   void _limparBusca() {
     _busca.clear();
-    _buscarAgora();
+    FocusScope.of(context).unfocus();
+    setState(() {});
   }
 
-  void _filtrarStatus(int? id) {
-    if (id == _statusId) return;
-    _statusId = id;
-    _recarregar();
+  void _filtrarStatus(int? id) => setState(() => _statusId = id);
+
+  Future<void> _atualizar() async {
+    final ok = await ref.read(obrasProvider.notifier).atualizar();
+    if (!ok && mounted) avisarSemConexao(context);
   }
+
+  /// Mesmas regras da API: status exato; descrição contém o texto.
+  List<Obra> _filtrar(List<Obra> todas) => [
+    for (final o in todas)
+      if ((_statusId == null || o.status?.id == _statusId) &&
+          contemBusca(_busca.text, [o.descricao]))
+        o,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -151,8 +81,8 @@ class _ObrasPageState extends ConsumerState<ObrasPage> {
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
           child: TextField(
             controller: _busca,
-            onChanged: _aoDigitar,
-            onSubmitted: (_) => _buscarAgora(),
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => FocusScope.of(context).unfocus(),
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'Buscar obra pela descrição',
@@ -179,66 +109,55 @@ class _ObrasPageState extends ConsumerState<ObrasPage> {
   }
 
   Widget _conteudo() {
-    if (_carregando && _obras.isEmpty) return const LoadingView();
-    if (_erro != null && _obras.isEmpty) {
-      return ErrorView(erro: _erro!, onRetry: _recarregar);
-    }
+    final obras = ref.watch(obrasProvider);
+    return obras.when(
+      skipLoadingOnRefresh: !obras.hasError,
+      loading: () => const LoadingView(),
+      error: (e, _) =>
+          ErrorView(erro: e, onRetry: () => ref.invalidate(obrasProvider)),
+      data: (dados) {
+        final lista = _filtrar(dados.valor);
+        final aviso = AvisoOffline(atualizadoEm: dados.atualizadoEm);
+        // Cache na tela enquanto a sincronização roda
+        final atualizando = dados.doCache && !ref.watch(syncProvider).offline;
 
-    return RefreshIndicator(
-      onRefresh: _recarregar,
-      child: _obras.isEmpty
-          ? ListView(
-              // ListView para o "puxar para atualizar" funcionar vazio
-              children: const [
-                SizedBox(height: 80),
-                EmptyView(
-                  mensagem: 'Nenhuma obra encontrada.',
-                  icone: Icons.apartment_outlined,
-                  detalhe: 'Tente outra busca ou outro filtro de status.',
+        return RefreshIndicator(
+          onRefresh: _atualizar,
+          child: lista.isEmpty
+              ? ListView(
+                  // ListView para o "puxar para atualizar" funcionar vazio
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                  children: [
+                    aviso,
+                    const SizedBox(height: 64),
+                    const EmptyView(
+                      mensagem: 'Nenhuma obra encontrada.',
+                      icone: Icons.apartment_outlined,
+                      detalhe: 'Tente outra busca ou outro filtro de status.',
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                  itemCount: lista.length + 1,
+                  itemBuilder: (context, i) {
+                    if (i == 0) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          aviso,
+                          _Contador(
+                            total: lista.length,
+                            atualizando: atualizando,
+                          ),
+                        ],
+                      );
+                    }
+                    return _ObraCard(obra: lista[i - 1]);
+                  },
                 ),
-              ],
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-              itemCount: _obras.length + 2,
-              itemBuilder: (context, i) {
-                if (i == 0) {
-                  return _Contador(total: _total, atualizando: _carregando);
-                }
-                if (i == _obras.length + 1) return _rodape();
-                return _ObraCard(obra: _obras[i - 1]);
-              },
-            ),
-    );
-  }
-
-  Widget _rodape() {
-    if (_erroMais != null) {
-      return Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Text(mensagemDeErro(_erroMais!), textAlign: TextAlign.center),
-            TextButton(
-              onPressed: _carregarMais,
-              child: const Text('Tentar novamente'),
-            ),
-          ],
-        ),
-      );
-    }
-    if (!_temMais) return const SizedBox(height: 8);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Center(
-        child: _carregandoMais
-            ? const CircularProgressIndicator()
-            : OutlinedButton.icon(
-                onPressed: _carregarMais,
-                icon: const Icon(Icons.expand_more),
-                label: const Text('Carregar mais'),
-              ),
-      ),
+        );
+      },
     );
   }
 }
@@ -288,7 +207,8 @@ class _FiltroStatus extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref.watch(dashboardProvider).valueOrNull?.status ?? const [];
+    final status =
+        ref.watch(dashboardProvider).valueOrNull?.valor.status ?? const [];
     if (status.isEmpty) return const SizedBox(height: 4);
 
     return SizedBox(
