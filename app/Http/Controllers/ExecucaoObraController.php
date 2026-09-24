@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Auditoria;
 use App\Models\ExecucaoObra;
 use App\Models\Obra;
 use App\Models\Contrato;
 use App\Models\Documento;
 use App\Models\User;
+use App\Services\AuditoriaService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -170,6 +172,7 @@ class ExecucaoObraController extends Controller
      */
     public function edit(Obra $obra, ExecucaoObra $execucao): View
     {
+        $this->garantirDaObra($obra, $execucao);
         $execucao->load(['responsaveis', 'documentos']);
 
         $contratos = Contrato::with('empresa')
@@ -212,10 +215,15 @@ class ExecucaoObraController extends Controller
 
     /**
      * Atualiza medição com recálculo de saldo/percentual + responsáveis + documentos.
+     * Admin e técnico; o motivo da correção vai para a auditoria.
      */
     public function update(Request $request, Obra $obra, ExecucaoObra $execucao): RedirectResponse
     {
+        $this->garantirDaObra($obra, $execucao);
+
         $dados = $request->validate([
+            'motivo'                => 'required|string|min:10|max:1000',
+            'retorno'               => 'nullable|in:contrato',
             'contrato_id'           => 'required|exists:contratos,id',
             'data_medicao'          => 'required|date',
             'valor_medido'          => 'required|numeric|min:0.01',
@@ -237,51 +245,15 @@ class ExecucaoObraController extends Controller
 
         try {
             DB::beginTransaction();
-
-            $valorMedido  = $this->normalizarMoeda($dados['valor_medido']);
-            $totalSemEsta = (float) $contrato->execucoes()->where('id', '!=', $execucao->id)->sum('valor_medido');
-            $totalComNova = $totalSemEsta + $valorMedido;
-
-            $execucao->update([
-                'contrato_id'          => $dados['contrato_id'],
-                'data_medicao'         => $dados['data_medicao'],
-                'valor_medido'         => $valorMedido,
-                'observacao'           => $dados['observacao'] ?? null,
-                'saldo_contratual'     => max(($contrato->valor_contrato ?? 0) - $totalComNova, 0),
-                'percentual_executado' => $contrato->valor_contrato > 0
-                    ? min(($totalComNova / $contrato->valor_contrato) * 100, 100)
-                    : null,
-            ]);
-
-            // Responsáveis — substitui todos
-            $syncData = [];
-            foreach ($dados['responsaveis'] ?? [] as $resp) {
-                $syncData[$resp['user_id']] = ['papel' => $resp['papel']];
-            }
-            $execucao->responsaveis()->sync($syncData);
-
-            // Novos documentos
-            if ($request->hasFile('arquivos')) {
-                foreach ($request->file('arquivos') as $i => $arquivo) {
-                    $caminho = $arquivo->store("documentos/medicoes/{$execucao->id}", 'public');
-
-                    $execucao->documentos()->create([
-                        'user_id'       => auth()->id(),
-                        'tipo'          => $dados['arquivos_tipo'][$i] ?? 'medicao',
-                        'nome_original' => $arquivo->getClientOriginalName(),
-                        'caminho'       => $caminho,
-                        'mime_type'     => $arquivo->getMimeType(),
-                        'tamanho_bytes' => $arquivo->getSize(),
-                        'descricao'     => $dados['arquivos_descricao'][$i] ?? null,
-                    ]);
-                }
-            }
-
+            AuditoriaService::comMotivo($dados['motivo'], fn() => $this->atualizar($request, $dados, $contrato, $execucao));
             DB::commit();
 
-            return redirect()
-                ->route('obras.show', $obra)
-                ->with('sucesso', 'Medição atualizada com sucesso!')
+            $destino = ($dados['retorno'] ?? null) === 'contrato'
+                ? redirect()->route('contratos.show', $contrato)
+                : redirect()->route('obras.show', $obra);
+
+            return $destino
+                ->with('sucesso', 'Medição atualizada com sucesso! A alteração foi registrada na auditoria.')
                 ->with('aba', 'execucoes');
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -292,22 +264,86 @@ class ExecucaoObraController extends Controller
         }
     }
 
-    /**
-     * Remove medição e seus documentos físicos.
-     */
-    public function destroy(Obra $obra, ExecucaoObra $execucao): RedirectResponse
+    /** Corpo do update (dentro da transação e do motivo de auditoria). */
+    private function atualizar(Request $request, array $dados, Contrato $contrato, ExecucaoObra $execucao): void
     {
+        $vinculosAntes = $execucao->vinculosParaAuditoria();
+
+        $valorMedido  = $this->normalizarMoeda($dados['valor_medido']);
+        $totalSemEsta = (float) $contrato->execucoes()->where('id', '!=', $execucao->id)->sum('valor_medido');
+        $totalComNova = $totalSemEsta + $valorMedido;
+
+        // Campos da medição → auditados pelo ExecucaoObraObserver
+        $execucao->update([
+            'contrato_id'          => $dados['contrato_id'],
+            'data_medicao'         => $dados['data_medicao'],
+            'valor_medido'         => $valorMedido,
+            'observacao'           => $dados['observacao'] ?? null,
+            'saldo_contratual'     => max(($contrato->valor_contrato ?? 0) - $totalComNova, 0),
+            'percentual_executado' => $contrato->valor_contrato > 0
+                ? min(($totalComNova / $contrato->valor_contrato) * 100, 100)
+                : null,
+        ]);
+
+        // Responsáveis — substitui todos
+        $syncData = [];
+        foreach ($dados['responsaveis'] ?? [] as $resp) {
+            $syncData[$resp['user_id']] = ['papel' => $resp['papel']];
+        }
+        $execucao->responsaveis()->sync($syncData);
+
+        // Novos documentos
+        if ($request->hasFile('arquivos')) {
+            foreach ($request->file('arquivos') as $i => $arquivo) {
+                $caminho = $arquivo->store("documentos/medicoes/{$execucao->id}", 'public');
+
+                $execucao->documentos()->create([
+                    'user_id'       => auth()->id(),
+                    'tipo'          => $dados['arquivos_tipo'][$i] ?? 'medicao',
+                    'nome_original' => $arquivo->getClientOriginalName(),
+                    'caminho'       => $caminho,
+                    'mime_type'     => $arquivo->getMimeType(),
+                    'tamanho_bytes' => $arquivo->getSize(),
+                    'descricao'     => $dados['arquivos_descricao'][$i] ?? null,
+                ]);
+            }
+        }
+
+        $this->auditarVinculos($execucao, $vinculosAntes, 'Responsáveis/documentos da medição alterados: ');
+    }
+
+    /**
+     * Remove medição e seus documentos físicos. Somente admin; o snapshot
+     * (com responsáveis e documentos) e o motivo vão para a auditoria.
+     */
+    public function destroy(Request $request, Obra $obra, ExecucaoObra $execucao): RedirectResponse
+    {
+        $this->garantirDaObra($obra, $execucao);
+
+        $dados = $request->validate([
+            'motivo' => 'required|string|min:10|max:1000',
+        ]);
+
         try {
             DB::beginTransaction();
 
-            // Documentos físicos são removidos pelo model event Documento::deleting
-            $execucao->documentos->each->delete();
-            $execucao->responsaveis()->detach();
-            $execucao->delete();
+            AuditoriaService::comMotivo($dados['motivo'], function () use ($execucao) {
+                $documentos = $execucao->documentos()->get();
+
+                // Excluir a medição primeiro: o Observer (deleting) ainda enxerga
+                // responsáveis e documentos para o snapshot da auditoria.
+                $execucao->delete();
+                $execucao->responsaveis()->detach();
+
+                // Documentos físicos são removidos pelo model event Documento::deleting
+                $documentos->each->delete();
+            });
 
             DB::commit();
 
-            return back()->with('sucesso', 'Medição excluída com sucesso.');
+            return back()
+                ->with('sucesso', 'Medição excluída com sucesso. A exclusão foi registrada na auditoria.')
+                ->with('aba', 'execucoes');
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('Erro ao excluir medição', ['execucao_id' => $execucao->id, 'erro' => $e->getMessage()]);
@@ -322,9 +358,15 @@ class ExecucaoObraController extends Controller
      */
     public function destroyDocumento(Obra $obra, ExecucaoObra $execucao, Documento $documento): RedirectResponse
     {
-        abort_unless($documento->documentable_id === $execucao->id, 403);
+        $this->garantirDaObra($obra, $execucao);
+        abort_unless(
+            $documento->documentable_type === ExecucaoObra::class && $documento->documentable_id === $execucao->id,
+            403
+        );
 
+        $vinculosAntes = $execucao->vinculosParaAuditoria();
         $documento->delete(); // model event remove o arquivo físico
+        $this->auditarVinculos($execucao, $vinculosAntes, 'Documento removido da medição: ');
 
         return back()->with('sucesso', 'Documento removido.');
     }
@@ -342,6 +384,37 @@ class ExecucaoObraController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────
+
+    /** A medição da URL precisa pertencer a um contrato da obra da URL. */
+    private function garantirDaObra(Obra $obra, ExecucaoObra $execucao): void
+    {
+        abort_unless($execucao->contrato()->where('obra_id', $obra->id)->exists(), 404);
+    }
+
+    /**
+     * Responsáveis (pivot) e documentos não disparam o Observer: registra na
+     * auditoria somente as listas que mudaram.
+     */
+    private function auditarVinculos(ExecucaoObra $execucao, array $antes, string $prefixo): void
+    {
+        $depois = $execucao->vinculosParaAuditoria();
+
+        $mudou = array_keys(array_filter($depois, fn($lista, $campo) => $lista !== $antes[$campo], ARRAY_FILTER_USE_BOTH));
+        if ($mudou === []) {
+            return;
+        }
+
+        $data = $execucao->data_medicao?->format('d/m/Y') ?? 'sem data';
+
+        app(AuditoriaService::class)->registrar(
+            Auditoria::ALTEROU,
+            $execucao,
+            array_intersect_key($antes, array_flip($mudou)),
+            array_intersect_key($depois, array_flip($mudou)),
+            $prefixo . $data . ' — R$ ' . number_format((float) $execucao->valor_medido, 2, ',', '.'),
+        );
+    }
+
     private function normalizarMoeda(mixed $valor): float
     {
         if (is_string($valor) && str_contains($valor, ',')) {

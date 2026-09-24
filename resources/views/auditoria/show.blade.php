@@ -69,6 +69,13 @@
             @endif
         </div>
 
+        @if ($auditoria->motivo)
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm">
+                <div class="text-xs font-semibold text-amber-800 uppercase">Motivo informado pelo usuário</div>
+                <div class="mt-1 text-slate-800 whitespace-pre-line">{{ $auditoria->motivo }}</div>
+            </div>
+        @endif
+
         {{-- =========================================================
         DADOS (antes / depois)
         ========================================================= --}}

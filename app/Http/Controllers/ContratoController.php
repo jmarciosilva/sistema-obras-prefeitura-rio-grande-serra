@@ -32,7 +32,11 @@ class ContratoController extends Controller
 
     public function show(Contrato $contrato): View
     {
-        $contrato->load(['obra.status', 'empresa', 'execucoes']);
+        $contrato->load([
+            'obra.status',
+            'empresa',
+            'execucoes' => fn($q) => $q->orderByDesc('data_medicao')->orderByDesc('id'),
+        ]);
 
         return view('contratos.show', compact('contrato'));
     }

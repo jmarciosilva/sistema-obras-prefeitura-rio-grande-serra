@@ -55,6 +55,7 @@
                     <form method="POST" action="{{ route('obras.execucoes.update', [$obra, $execucao]) }}" enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
+                        <input type="hidden" name="retorno" value="{{ old('retorno', request('retorno')) }}">
 
                         <div class="px-8 py-6 space-y-8">
 
@@ -214,13 +215,11 @@
                                                 ⬇️ Baixar
                                             </a>
                                             @if (auth()->user()->perfil === 'admin')
-                                                <form method="POST" action="{{ route('obras.execucoes.documentos.destroy', [$obra, $execucao, $doc]) }}" class="shrink-0">
-                                                    @csrf @method('DELETE')
-                                                    <button type="submit" onclick="return confirm('Remover este documento?')"
-                                                        class="px-2 py-1.5 text-xs rounded border border-red-200 text-red-600 bg-red-50 hover:bg-red-100">
-                                                        🗑
-                                                    </button>
-                                                </form>
+                                                <button type="submit" form="remover-doc-{{ $doc->id }}"
+                                                    onclick="return confirm('Remover este documento? A remoção será registrada na auditoria.')"
+                                                    class="px-2 py-1.5 text-xs rounded border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 shrink-0">
+                                                    🗑
+                                                </button>
                                             @endif
                                         </div>
                                     @endforeach
@@ -272,11 +271,36 @@
 
                         </div>
 
+                        {{-- MOTIVO DA CORREÇÃO (vai para a auditoria) --}}
+                        <div class="px-8 pb-6">
+                            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                                <label for="motivo" class="text-sm font-semibold text-amber-900">
+                                    Motivo da correção <span class="text-red-600">*</span>
+                                </label>
+                                <textarea id="motivo" name="motivo" rows="2" required minlength="10" maxlength="1000"
+                                    placeholder="Ex.: valor lançado com erro de digitação — correto conforme boletim nº 3"
+                                    class="w-full px-4 py-2.5 rounded-lg border focus:ring-2 focus:ring-amber-500 resize-none {{ $errors->has('motivo') ? 'border-red-400' : 'border-slate-300' }}">{{ old('motivo') }}</textarea>
+                                @error('motivo')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
+                                <p class="text-xs text-amber-800">
+                                    🔒 A alteração (valores antes/depois), o usuário e este motivo ficam registrados no Histórico de Atividades.
+                                </p>
+                            </div>
+                        </div>
+
                         <div class="px-8 py-5 border-t bg-slate-50 rounded-b-xl flex justify-between">
-                            <a href="{{ route('obras.show', $obra) }}" class="px-5 py-2.5 rounded-lg text-sm font-medium text-slate-700 bg-white border">← Cancelar</a>
+                            <a href="{{ old('retorno', request('retorno')) === 'contrato' ? route('contratos.show', $execucao->contrato_id) : route('obras.show', $obra) }}" class="px-5 py-2.5 rounded-lg text-sm font-medium text-slate-700 bg-white border">← Cancelar</a>
                             <button type="submit" class="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-amber-600 hover:bg-amber-700">✔ Atualizar Medição</button>
                         </div>
                     </form>
+
+                    @if (auth()->user()->perfil === 'admin')
+                        @foreach ($execucao->documentos as $doc)
+                            <form id="remover-doc-{{ $doc->id }}" method="POST" class="hidden"
+                                action="{{ route('obras.execucoes.documentos.destroy', [$obra, $execucao, $doc]) }}">
+                                @csrf @method('DELETE')
+                            </form>
+                        @endforeach
+                    @endif
                 </div>
             </div>
         </div>

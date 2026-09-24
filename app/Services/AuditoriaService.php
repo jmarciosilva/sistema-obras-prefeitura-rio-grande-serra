@@ -28,6 +28,25 @@ class AuditoriaService
         'credenciais', 'two_factor_secret', 'two_factor_recovery_codes',
     ];
 
+    /** Justificativa aplicada a todos os registros gravados dentro de comMotivo(). */
+    private static ?string $motivo = null;
+
+    /**
+     * Executa $operacao anexando $motivo a toda auditoria gerada nela
+     * (inclusive as disparadas pelos Observers).
+     */
+    public static function comMotivo(?string $motivo, \Closure $operacao): mixed
+    {
+        $anterior     = self::$motivo;
+        self::$motivo = $motivo !== null && trim($motivo) !== '' ? trim($motivo) : null;
+
+        try {
+            return $operacao();
+        } finally {
+            self::$motivo = $anterior;
+        }
+    }
+
     public function registrar(
         string $acao,
         Model $model,
@@ -42,6 +61,7 @@ class AuditoriaService
                 'auditable_type' => $model::class,
                 'auditable_id'   => $model->getKey(),
                 'descricao'      => $descricao ? Str::limit($descricao, 250) : null,
+                'motivo'         => self::$motivo,
                 'dados_antes'    => $antes === null ? null : self::limpar($antes),
                 'dados_depois'   => $depois === null ? null : self::limpar($depois),
                 'ip_address'     => request()?->ip(),

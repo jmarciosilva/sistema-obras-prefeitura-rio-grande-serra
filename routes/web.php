@@ -113,8 +113,6 @@ Route::middleware(['auth'])->group(function () {
             Route::middleware('perfil:admin,tecnico')->group(function () {
                 Route::get('/criar',  [ExecucaoObraController::class, 'create'])->name('create');
                 Route::post('/salvar', [ExecucaoObraController::class, 'store'])->name('store');
-                Route::get('/{execucao}/editar',   [ExecucaoObraController::class, 'edit'])->name('edit');
-                Route::put('/{execucao}/atualizar', [ExecucaoObraController::class, 'update'])->name('update');
 
                 // ↓ NOVAS ROTAS — documentos da medição ↓
                 Route::get(
@@ -122,8 +120,13 @@ Route::middleware(['auth'])->group(function () {
                     [ExecucaoObraController::class, 'downloadDocumento']
                 )
                     ->name('documentos.download');
+
+                // Correção de medição lançada errada: motivo obrigatório → auditoria
+                Route::get('/{execucao}/editar',   [ExecucaoObraController::class, 'edit'])->name('edit');
+                Route::put('/{execucao}/atualizar', [ExecucaoObraController::class, 'update'])->name('update');
             });
 
+            // Exclusão de medição: somente admin, motivo obrigatório → auditoria
             Route::middleware('perfil:admin')->group(function () {
                 Route::delete('/{execucao}/excluir', [ExecucaoObraController::class, 'destroy'])->name('destroy');
 

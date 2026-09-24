@@ -78,4 +78,21 @@ class ExecucaoObra extends Model
     {
         return $this->morphMany(Documento::class, 'documentable');
     }
+
+    // ── Auditoria ─────────────────────────────────────────────────
+
+    /**
+     * Responsáveis e documentos em texto legível, para o histórico de
+     * auditoria (sobrevive à exclusão dos usuários/arquivos). Sempre
+     * consulta o banco — não usa relações já carregadas.
+     */
+    public function vinculosParaAuditoria(): array
+    {
+        return [
+            'responsaveis' => $this->responsaveis()->get()
+                ->map(fn(User $u) => $u->name . ' — ' . (self::$papeis[$u->pivot->papel] ?? $u->pivot->papel))
+                ->sort()->values()->all(),
+            'documentos' => $this->documentos()->orderBy('id')->pluck('nome_original')->all(),
+        ];
+    }
 }

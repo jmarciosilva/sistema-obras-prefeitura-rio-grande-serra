@@ -5,7 +5,7 @@
 
 @section('content')
 
-    <div class="space-y-6" x-data="{ modalDelete: false, urlDelete: '', modalAjuda: false }">
+    <div class="space-y-6" x-data="{ modalAjuda: false }">
 
         {{-- BREADCRUMB --}}
         <div class="flex items-center justify-between">
@@ -108,7 +108,7 @@
                         <th class="px-4 py-3 text-right text-xs text-slate-500 font-semibold">Saldo após</th>
                         <th class="px-4 py-3 text-center text-xs text-slate-500 font-semibold">% Acum.</th>
                         <th class="px-4 py-3 text-left text-xs text-slate-500 font-semibold">Observação</th>
-                        @if (auth()->user()->perfil !== 'operador')
+                        @if (in_array(auth()->user()->perfil, ['admin', 'tecnico']))
                             <th class="px-4 py-3 text-right text-xs text-slate-500 font-semibold">Ações</th>
                         @endif
                     </tr>
@@ -168,19 +168,19 @@
                                 {{ Str::limit($ex->observacao ?? '—', 60) }}
                             </td>
 
-                            @if (auth()->user()->perfil !== 'operador')
+                            @if (in_array(auth()->user()->perfil, ['admin', 'tecnico']))
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex justify-end gap-2">
-                                        <a href="{{ route('obras.execucoes.edit', [$obra, $ex]) }}"
+                                        <a href="{{ route('obras.execucoes.edit', [$obra, $ex]) }}" title="Corrigir medição"
                                             class="px-2 py-1.5 text-xs rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100">
                                             ✏️
                                         </a>
                                         @if (auth()->user()->perfil === 'admin')
-                                            <button type="button"
-                                                @click="modalDelete = true; urlDelete = '{{ route('obras.execucoes.destroy', [$obra, $ex]) }}'"
-                                                class="px-2 py-1.5 text-xs rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100">
-                                                🗑
-                                            </button>
+                                        <button type="button" title="Excluir medição"
+                                            @click="$dispatch('excluir-medicao', { url: '{{ route('obras.execucoes.destroy', [$obra, $ex]) }}', resumo: '{{ $ex->data_medicao?->format('d/m/Y') }} — R$ {{ number_format($ex->valor_medido, 2, ',', '.') }}' })"
+                                            class="px-2 py-1.5 text-xs rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100">
+                                            🗑
+                                        </button>
                                         @endif
                                     </div>
                                 </td>
@@ -224,8 +224,9 @@
                     <p><strong>Saldo após:</strong> Saldo contratual restante após esta medição ter sido registrada.</p>
                     <p><strong>% Acum.:</strong> Percentual acumulado da execução do contrato até esta medição.</p>
                     <div class="bg-slate-50 p-4 rounded text-xs">
-                        💡 Cada medição é acumulativa. O sistema não permite sobrescrever — cada medição é um novo registro
-                        no histórico.
+                        💡 Cada medição é acumulativa — cada medição é um novo registro no histórico. Medições lançadas
+                        erradas podem ser corrigidas ou excluídas por administradores e técnicos (exclusão somente administradores), com motivo obrigatório
+                        registrado no Histórico de Atividades.
                     </div>
                 </div>
                 <div class="px-6 py-4 border-t flex justify-end">
@@ -236,24 +237,8 @@
             </div>
         </div>
 
-        {{-- MODAL EXCLUSÃO --}}
-        <div x-show="modalDelete" x-cloak class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div class="bg-white rounded-xl p-6 w-full max-w-md text-center">
-                <h3 class="text-lg font-semibold text-red-600 mb-4">Confirmar exclusão</h3>
-                <p class="text-sm text-slate-600 mb-2">Esta medição será removida permanentemente.</p>
-                <p class="text-xs text-slate-500 mb-6">
-                    ⚠️ O saldo e percentual exibidos nas demais medições não serão recalculados retroativamente.
-                </p>
-                <div class="flex justify-center gap-3">
-                    <button @click="modalDelete = false" class="px-4 py-2 border rounded">Cancelar</button>
-                    <form :action="urlDelete" method="POST">
-                        @csrf
-                        @method('DELETE')
-                        <button class="px-5 py-2 bg-red-600 text-white rounded">Excluir</button>
-                    </form>
-                </div>
-            </div>
-        </div>
+        {{-- MODAL EXCLUSÃO (motivo obrigatório → auditoria) --}}
+        @include('execucoes._modal-excluir')
 
     </div>
 

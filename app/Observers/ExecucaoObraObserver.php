@@ -2,12 +2,20 @@
 
 namespace App\Observers;
 
+use App\Models\Auditoria;
 use App\Models\ExecucaoObra;
 use App\Services\AuditoriaService;
 
-/** Auditoria de Medições (execucao_obras). */
+/**
+ * Auditoria de Medições (execucao_obras). Responsáveis (pivot) e documentos
+ * não disparam eventos do Model: alterações neles são auditadas no
+ * ExecucaoObraController; na exclusão entram no snapshot abaixo.
+ */
 class ExecucaoObraObserver
 {
+    /** Responsáveis/documentos capturados antes da exclusão. */
+    private static array $vinculos = [];
+
     public function __construct(private AuditoriaService $auditoria) {}
 
     public function created(ExecucaoObra $medicao): void
@@ -20,9 +28,23 @@ class ExecucaoObraObserver
         $this->auditoria->alterado($medicao, 'Medição atualizada: ' . self::nome($medicao));
     }
 
+    public function deleting(ExecucaoObra $medicao): void
+    {
+        self::$vinculos[spl_object_id($medicao)] = $medicao->vinculosParaAuditoria();
+    }
+
     public function deleted(ExecucaoObra $medicao): void
     {
-        $this->auditoria->excluido($medicao, 'Medição excluída: ' . self::nome($medicao));
+        $vinculos = self::$vinculos[spl_object_id($medicao)] ?? [];
+        unset(self::$vinculos[spl_object_id($medicao)]);
+
+        $this->auditoria->registrar(
+            Auditoria::EXCLUIU,
+            $medicao,
+            array_merge($medicao->getRawOriginal(), $vinculos),
+            null,
+            'Medição excluída: ' . self::nome($medicao),
+        );
     }
 
     /** "10/06/2026 — R$ 90.732,76" */

@@ -292,6 +292,7 @@ class AuditoriaTest extends TestCase
             'contrato_id'  => $contrato->id,
             'data_medicao' => '2026-06-10',
             'valor_medido' => 300,
+            'motivo'       => 'Valor digitado errado no lançamento',
         ])->assertRedirect();
 
         $alterou = $this->ultima();
@@ -301,12 +302,178 @@ class AuditoriaTest extends TestCase
         $this->assertArrayNotHasKey('data_medicao', $alterou->dados_depois); // não mudou
         $this->assertArrayNotHasKey('updated_at', $alterou->dados_depois);
 
-        $this->delete(route('obras.execucoes.destroy', [$obra, $medicao]))->assertRedirect();
+        $this->delete(route('obras.execucoes.destroy', [$obra, $medicao]), ['motivo' => 'Medição lançada em duplicidade'])
+            ->assertRedirect();
 
         $excluiu = $this->ultima();
         $this->assertSame(Auditoria::EXCLUIU, $excluiu->acao);
         $this->assertStringContainsString('Medição excluída: 10/06/2026', $excluiu->descricao);
         $this->assertEquals(300, $excluiu->dados_antes['valor_medido']);
+    }
+
+    public function test_correcao_e_exclusao_de_medicao_exigem_motivo_e_o_gravam(): void
+    {
+        $this->actingAs($this->admin);
+        $obra     = $this->obra();
+        $contrato = $this->contrato($obra);
+        $medicao  = ExecucaoObra::create(['contrato_id' => $contrato->id, 'data_medicao' => '2026-06-10', 'valor_medido' => 250]);
+        $total    = Auditoria::count();
+
+        // Sem motivo → nada muda
+        $this->put(route('obras.execucoes.update', [$obra, $medicao]), [
+            'contrato_id'  => $contrato->id,
+            'data_medicao' => '2026-06-10',
+            'valor_medido' => 999,
+        ])->assertSessionHasErrors('motivo');
+        $this->delete(route('obras.execucoes.destroy', [$obra, $medicao]))->assertSessionHasErrors('motivo');
+
+        $this->assertEquals(250, $medicao->fresh()->valor_medido);
+        $this->assertSame($total, Auditoria::count());
+
+        // Com motivo → motivo gravado e exibido no histórico
+        $this->put(route('obras.execucoes.update', [$obra, $medicao]), [
+            'contrato_id'  => $contrato->id,
+            'data_medicao' => '2026-06-10',
+            'valor_medido' => 280,
+            'motivo'       => 'Boletim corrigido pela fiscalização',
+        ])->assertRedirect();
+
+        $alterou = $this->ultima();
+        $this->assertSame('Boletim corrigido pela fiscalização', $alterou->motivo);
+        $this->get(route('auditoria.show', $alterou))->assertOk()->assertSee('Boletim corrigido pela fiscalização');
+        $this->get(route('auditoria.index'))->assertOk()->assertSee('Motivo: Boletim corrigido');
+
+        $this->delete(route('obras.execucoes.destroy', [$obra, $medicao]), ['motivo' => 'Lançada na obra errada'])
+            ->assertRedirect();
+        $this->assertSame('Lançada na obra errada', $this->ultima()->motivo);
+        $this->assertDatabaseMissing('execucao_obras', ['id' => $medicao->id]);
+
+        // Registros fora da correção/exclusão não herdam o motivo
+        $this->assertNull(Auditoria::where('acao', Auditoria::CRIOU)->latest('id')->first()->motivo);
+    }
+
+    public function test_responsaveis_e_documentos_da_medicao_sao_auditados(): void
+    {
+        $this->actingAs($this->admin);
+        $obra     = $this->obra();
+        $contrato = $this->contrato($obra);
+        $fiscal   = User::factory()->create(['name' => 'Ana Fiscal', 'perfil' => 'tecnico', 'ativo' => true]);
+        $medicao  = ExecucaoObra::create(['contrato_id' => $contrato->id, 'data_medicao' => '2026-06-10', 'valor_medido' => 250]);
+        $medicao->documentos()->create([
+            'user_id'       => $this->admin->id,
+            'tipo'          => 'medicao',
+            'nome_original' => 'boletim-01.pdf',
+            'caminho'       => 'documentos/medicoes/x/boletim-01.pdf',
+            'mime_type'     => 'application/pdf',
+            'tamanho_bytes' => 10,
+        ]);
+
+        // Só troca responsáveis (campos da medição iguais) → ainda assim auditado
+        $this->put(route('obras.execucoes.update', [$obra, $medicao]), [
+            'contrato_id'  => $contrato->id,
+            'data_medicao' => '2026-06-10',
+            'valor_medido' => 250,
+            'responsaveis' => [['user_id' => $fiscal->id, 'papel' => 'fiscal']],
+            'motivo'       => 'Fiscal não havia sido informado',
+        ])->assertRedirect();
+
+        $a = $this->ultima();
+        $this->assertSame(Auditoria::ALTEROU, $a->acao);
+        $this->assertSame(['responsaveis' => []], $a->dados_antes);
+        $this->assertSame(['responsaveis' => ['Ana Fiscal — Fiscal']], $a->dados_depois);
+        $this->assertSame('Fiscal não havia sido informado', $a->motivo);
+        $this->get(route('auditoria.show', $a))->assertOk()->assertSee('Responsáveis')->assertSee('Ana Fiscal — Fiscal');
+
+        // Exclusão: snapshot inclui responsáveis e documentos
+        $this->delete(route('obras.execucoes.destroy', [$obra, $medicao]), ['motivo' => 'Medição lançada em duplicidade'])
+            ->assertRedirect();
+
+        $excluiu = $this->ultima();
+        $this->assertSame(Auditoria::EXCLUIU, $excluiu->acao);
+        $this->assertSame(['Ana Fiscal — Fiscal'], $excluiu->dados_antes['responsaveis']);
+        $this->assertSame(['boletim-01.pdf'], $excluiu->dados_antes['documentos']);
+        $this->assertSame(0, $medicao->documentos()->count());
+    }
+
+    public function test_tecnico_corrige_mas_somente_admin_exclui_medicao(): void
+    {
+        $obra     = $this->obra();
+        $contrato = $this->contrato($obra);
+        $medicao  = ExecucaoObra::create(['contrato_id' => $contrato->id, 'data_medicao' => '2026-06-10', 'valor_medido' => 250]);
+        $dados    = ['contrato_id' => $contrato->id, 'data_medicao' => '2026-06-10', 'valor_medido' => 1, 'motivo' => 'Valor lançado errado pelo técnico'];
+
+        foreach (['secretario', 'operador'] as $perfil) {
+            $this->actingAs($this->usuario($perfil));
+            $this->get(route('obras.execucoes.edit', [$obra, $medicao]))->assertForbidden();
+            $this->put(route('obras.execucoes.update', [$obra, $medicao]), $dados)->assertForbidden();
+            $this->delete(route('obras.execucoes.destroy', [$obra, $medicao]), $dados)->assertForbidden();
+            $this->get(route('obras.show', $obra))->assertOk()
+                ->assertDontSee('Corrigir medição')->assertDontSee('Excluir medição');
+        }
+        $this->assertEquals(250, $medicao->fresh()->valor_medido);
+
+        // Técnico: corrige (com motivo auditado), mas não exclui
+        $tecnico = $this->usuario('tecnico');
+        $this->actingAs($tecnico);
+        $this->get(route('obras.show', $obra))->assertOk()
+            ->assertSee('Corrigir medição')->assertDontSee('Excluir medição');
+        $this->get(route('obras.execucoes.edit', [$obra, $medicao]))->assertOk()->assertSee('Motivo da correção');
+        $this->put(route('obras.execucoes.update', [$obra, $medicao]), $dados)->assertRedirect();
+        $this->assertEquals(1, $medicao->fresh()->valor_medido);
+        $this->assertSame($tecnico->id, $this->ultima()->user_id);
+        $this->assertSame('Valor lançado errado pelo técnico', $this->ultima()->motivo);
+        $this->delete(route('obras.execucoes.destroy', [$obra, $medicao]), $dados)->assertForbidden();
+        $this->assertDatabaseHas('execucao_obras', ['id' => $medicao->id]);
+
+        $this->actingAs($this->admin);
+        $this->get(route('obras.show', $obra))->assertOk()->assertSee('Excluir medição')->assertSee('Motivo da exclusão');
+        $this->get(route('obras.execucoes.edit', [$obra, $medicao]))->assertOk()->assertSee('Motivo da correção');
+    }
+
+    public function test_medicao_pode_ser_corrigida_e_excluida_a_partir_do_contrato(): void
+    {
+        $obra     = $this->obra();
+        $contrato = $this->contrato($obra);
+        $medicao  = ExecucaoObra::create(['contrato_id' => $contrato->id, 'data_medicao' => '2026-06-10', 'valor_medido' => 250]);
+
+        // Técnico: vê o ✏️ no contrato, não o 🗑; ao salvar volta para o contrato
+        $this->actingAs($this->usuario('tecnico'));
+        $this->get(route('contratos.show', $contrato))->assertOk()
+            ->assertSee(route('obras.execucoes.edit', [$obra, $medicao, 'retorno' => 'contrato']), false)
+            ->assertDontSee('Excluir medição');
+
+        $this->put(route('obras.execucoes.update', [$obra, $medicao]), [
+            'contrato_id'  => $contrato->id,
+            'data_medicao' => '2026-06-10',
+            'valor_medido' => 260,
+            'motivo'       => 'Correção feita pela tela do contrato',
+            'retorno'      => 'contrato',
+        ])->assertRedirect(route('contratos.show', $contrato));
+        $this->assertSame('Correção feita pela tela do contrato', $this->ultima()->motivo);
+
+        // Admin: vê o 🗑 e o modal com motivo
+        $this->actingAs($this->admin);
+        $this->get(route('contratos.show', $contrato))->assertOk()
+            ->assertSee('Excluir medição')
+            ->assertSee('Motivo da exclusão');
+
+        // Operador: nenhuma ação
+        $this->actingAs($this->usuario('operador'));
+        $this->get(route('contratos.show', $contrato))->assertOk()
+            ->assertDontSee('Corrigir medição')
+            ->assertDontSee('Excluir medição');
+    }
+
+    public function test_medicao_de_outra_obra_nao_pode_ser_alterada_pela_url(): void
+    {
+        $this->actingAs($this->admin);
+        $obraA   = $this->obra();
+        $obraB   = $this->obra(['descricao' => 'Outra obra']);
+        $medicao = ExecucaoObra::create(['contrato_id' => $this->contrato($obraA)->id, 'data_medicao' => '2026-06-10', 'valor_medido' => 250]);
+
+        $this->delete(route('obras.execucoes.destroy', [$obraB, $medicao]), ['motivo' => 'Tentativa por outra obra'])
+            ->assertNotFound();
+        $this->assertDatabaseHas('execucao_obras', ['id' => $medicao->id]);
     }
 
     // ── Robustez ─────────────────────────────────────────────────

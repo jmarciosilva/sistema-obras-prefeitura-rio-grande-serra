@@ -793,7 +793,7 @@
                                             <th class="px-3 py-2 text-right text-xs text-slate-500">Valor Medido</th>
                                             <th class="px-3 py-2 text-right text-xs text-slate-500">Saldo após</th>
                                             <th class="px-3 py-2 text-center text-xs text-slate-500">% Acum.</th>
-                                            @if (auth()->user()->perfil !== 'operador')
+                                            @if (in_array(auth()->user()->perfil, ['admin', 'tecnico']))
                                                 <th class="px-3 py-2 text-right text-xs text-slate-500">Ações</th>
                                             @endif
                                         </tr>
@@ -858,12 +858,19 @@
                                                     @endif
                                                 </td>
 
-                                                @if (auth()->user()->perfil !== 'operador')
-                                                    <td class="px-3 py-2 text-right">
-                                                        <a href="{{ route('obras.execucoes.edit', [$obra, $ex]) }}"
+                                                @if (in_array(auth()->user()->perfil, ['admin', 'tecnico']))
+                                                    <td class="px-3 py-2 text-right whitespace-nowrap">
+                                                        <a href="{{ route('obras.execucoes.edit', [$obra, $ex]) }}" title="Corrigir medição"
                                                             class="px-2 py-1 text-xs rounded border border-blue-200 text-blue-700 hover:bg-blue-50">
                                                             ✏️
                                                         </a>
+                                                        @if (auth()->user()->perfil === 'admin')
+                                                        <button type="button" title="Excluir medição"
+                                                            @click="$dispatch('excluir-medicao', { url: '{{ route('obras.execucoes.destroy', [$obra, $ex]) }}', resumo: '{{ $ex->data_medicao?->format('d/m/Y') }} — R$ {{ number_format($ex->valor_medido ?? 0, 2, ',', '.') }}' })"
+                                                            class="ml-1 px-2 py-1 text-xs rounded border border-red-200 text-red-700 hover:bg-red-50">
+                                                            🗑
+                                                        </button>
+                                                        @endif
                                                     </td>
                                                 @endif
 
@@ -890,6 +897,9 @@
                         @endif
 
                     </div>{{-- /vista tabela --}}
+
+                    {{-- Modal de exclusão de medição (admin, motivo obrigatório → auditoria) --}}
+                    @include('execucoes._modal-excluir')
 
                     {{-- ── Modal: explicação do algoritmo de projeção ── --}}
                     <div x-show="modalAjudaGrafico" x-cloak
@@ -940,17 +950,19 @@
                 <div x-show="aba === 'documentos'" x-cloak>
 
                     @php
-                        // Ícone por extensão de arquivo
-                        function iconeDoc(string $nome): string
-                        {
-                            $ext = strtolower(pathinfo($nome, PATHINFO_EXTENSION));
-                            return match ($ext) {
-                                'pdf' => '📄',
-                                'jpg', 'jpeg', 'png', 'gif', 'webp' => '🖼️',
-                                'xlsx', 'xls', 'csv' => '📊',
-                                'docx', 'doc' => '📝',
-                                default => '📎',
-                            };
+                        // Ícone por extensão de arquivo (guarda: a view pode ser renderizada 2x no mesmo processo)
+                        if (! function_exists('iconeDoc')) {
+                            function iconeDoc(string $nome): string
+                            {
+                                $ext = strtolower(pathinfo($nome, PATHINFO_EXTENSION));
+                                return match ($ext) {
+                                    'pdf' => '📄',
+                                    'jpg', 'jpeg', 'png', 'gif', 'webp' => '🖼️',
+                                    'xlsx', 'xls', 'csv' => '📊',
+                                    'docx', 'doc' => '📝',
+                                    default => '📎',
+                                };
+                            }
                         }
 
                         // Coleta documentos de medições via contratos → execucoes → documentos

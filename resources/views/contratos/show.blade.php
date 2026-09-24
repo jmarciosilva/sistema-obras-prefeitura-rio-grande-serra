@@ -226,10 +226,12 @@
                                 Histórico de medições vinculadas a este contrato
                             </p>
                         </div>
-                        <a href="{{ route('obras.execucoes.create', $contrato->obra) }}"
-                            class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
-                            ➕ Nova Medição
-                        </a>
+                        @if (in_array(auth()->user()->perfil, ['admin', 'tecnico']))
+                            <a href="{{ route('obras.execucoes.create', $contrato->obra) }}"
+                                class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                ➕ Nova Medição
+                            </a>
+                        @endif
                     </div>
 
                     <div class="p-6">
@@ -240,13 +242,27 @@
                                         {{ $ex->data_medicao?->format('d/m/Y') ?? '—' }}
                                     </p>
                                     <p class="text-xs text-slate-500">
-                                        {{ $ex->descricao ?? 'Sem descrição' }}
+                                        {{ Str::limit($ex->observacao ?? 'Sem observação', 80) }}
                                     </p>
                                 </div>
-                                <div class="text-right">
-                                    <p class="font-semibold text-green-700">
+                                <div class="flex items-center gap-3">
+                                    <p class="font-semibold text-green-700 whitespace-nowrap">
                                         R$ {{ number_format($ex->valor_medido ?? 0, 2, ',', '.') }}
                                     </p>
+                                    @if (in_array(auth()->user()->perfil, ['admin', 'tecnico']))
+                                        <a href="{{ route('obras.execucoes.edit', [$contrato->obra, $ex, 'retorno' => 'contrato']) }}"
+                                            title="Corrigir medição"
+                                            class="px-2 py-1 text-xs rounded border border-blue-200 text-blue-700 hover:bg-blue-50">
+                                            ✏️
+                                        </a>
+                                    @endif
+                                    @if (auth()->user()->perfil === 'admin')
+                                        <button type="button" title="Excluir medição"
+                                            @click="$dispatch('excluir-medicao', { url: '{{ route('obras.execucoes.destroy', [$contrato->obra, $ex]) }}', resumo: '{{ $ex->data_medicao?->format('d/m/Y') }} — R$ {{ number_format($ex->valor_medido ?? 0, 2, ',', '.') }}' })"
+                                            class="px-2 py-1 text-xs rounded border border-red-200 text-red-700 hover:bg-red-50">
+                                            🗑
+                                        </button>
+                                    @endif
                                 </div>
                             </div>
                         @empty
@@ -254,6 +270,11 @@
                                 Nenhuma medição registrada para este contrato.
                             </p>
                         @endforelse
+                    </div>
+
+                    {{-- Modal de exclusão de medição (admin, motivo obrigatório → auditoria) --}}
+                    <div class="px-6">
+                        @include('execucoes._modal-excluir')
                     </div>
 
                 </div>

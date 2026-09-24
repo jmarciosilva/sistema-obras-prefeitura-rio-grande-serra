@@ -37,6 +37,7 @@ class Auditoria extends Model
         'auditable_type',
         'auditable_id',
         'descricao',
+        'motivo',
         'dados_antes',
         'dados_depois',
         'ip_address',

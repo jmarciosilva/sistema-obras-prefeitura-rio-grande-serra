@@ -125,7 +125,12 @@
                                 </td>
                                 <td class="px-4 py-3 text-slate-700">{{ $a->modulo_label }}</td>
                                 <td class="px-4 py-3 text-slate-500">#{{ $a->auditable_id }}</td>
-                                <td class="px-4 py-3 text-slate-700">{{ $a->descricao }}</td>
+                                <td class="px-4 py-3 text-slate-700">
+                                    {{ $a->descricao }}
+                                    @if ($a->motivo)
+                                        <div class="text-xs text-amber-700 mt-0.5">Motivo: {{ Str::limit($a->motivo, 90) }}</div>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-3 text-right">
                                     <a href="{{ route('auditoria.show', $a) }}"
                                         class="px-3 py-1 text-xs rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100">

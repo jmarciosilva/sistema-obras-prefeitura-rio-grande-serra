@@ -44,6 +44,8 @@ class AuditoriaFormatador
         'saldo_contratual'     => 'Saldo contratual',
         'percentual_executado' => 'Percentual executado',
         'observacao'           => 'Observação',
+        'responsaveis'         => 'Responsáveis',
+        'documentos'           => 'Documentos anexados',
     ];
 
     private const MOEDA = ['valor_contrato', 'valor_medido', 'saldo_contratual'];
@@ -115,6 +117,11 @@ class AuditoriaFormatador
             } catch (\Throwable) {
                 return (string) $valor;
             }
+        }
+
+        // Listas de textos (ex.: responsáveis, documentos): uma por linha
+        if (is_array($valor) && array_is_list($valor) && collect($valor)->every(fn($v) => is_scalar($v))) {
+            return $valor === [] ? 'Nenhum' : implode("\n", $valor);
         }
 
         return is_array($valor) ? json_encode($valor, JSON_UNESCAPED_UNICODE) : (string) $valor;
